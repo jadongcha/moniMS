@@ -1,0 +1,18 @@
+<Project>
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <!-- 리눅스 CI에서도 Windows 대상 빌드가 되도록 -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Company>MoniMS</Company>
+    <Product>MoniMS</Product>
+    <!-- 릴리스 빌드(GitHub Actions)는 태그에서 버전을, 저장소에서 주소를 받아 덮어쓴다 -->
+    <Version>0.1.0</Version>
+    <Authors>Bgg</Authors>
+    <Copyright>Copyright (c) 2026 Bgg</Copyright>
+    <RepositoryUrl>https://github.com/jadongcha/moniMS</RepositoryUrl>
+  </PropertyGroup>
+</Project>

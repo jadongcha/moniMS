@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>MoniMS.App</RootNamespace>
+    <AssemblyName>MoniMS</AssemblyName>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- WPF는 app.manifest로 DPI를 지정하는 것이 정석 (WinForms 경고 무시) -->
+    <NoWarn>$(NoWarn);WFAC010;WFO0003</NoWarn>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\moniMS.ico</ApplicationIcon>
+    <!-- Velopack이 가장 먼저 실행돼야 해서 WPF 자동 생성 Main 대신 Program.Main 사용 -->
+    <StartupObject>MoniMS.App.Program</StartupObject>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- 업데이트 확인용 저장소 주소를 실행 파일에 기록 -->
+    <AssemblyMetadata Include="RepositoryUrl" Value="$(RepositoryUrl)" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- WinForms는 트레이 아이콘(NotifyIcon)에만 사용. 전역 using 충돌 방지 -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+    <Using Include="System.IO" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.12" />
+    <PackageReference Include="Velopack" Version="1.2.161" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\MoniMS.Core\MoniMS.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Assets\moniMS.ico" />
+    <!-- JetBrains Mono (SIL Open Font License 1.1, Assets/Fonts/JetBrainsMono-OFL.txt) -->
+    <Resource Include="Assets\Fonts\*.ttf" />
+    <None Include="Assets\Fonts\JetBrainsMono-OFL.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

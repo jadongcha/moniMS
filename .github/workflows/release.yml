@@ -1,0 +1,78 @@
+# v로 시작하는 태그(예: v1.0.0)를 푸시하면:
+#   테스트 → 빌드 → Velopack 설치 파일 생성 → GitHub Release 업로드
+# 태그에 하이픈이 있으면(v1.1.0-beta.1) 시험판(pre-release)으로 올린다.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write # Release 생성/업로드
+
+env:
+  PACK_ID: MoniMS
+  VPK_VERSION: 1.2.161
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Read version from tag
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          if ($version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') {
+            throw "Tag '${{ github.ref_name }}' is not a version like v1.2.3"
+          }
+          "VERSION=$version" >> $env:GITHUB_ENV
+          "REPO_URL=${{ github.server_url }}/${{ github.repository }}" >> $env:GITHUB_ENV
+
+      - name: Test
+        run: dotnet test MoniMS.sln -c Release
+
+      - name: Publish
+        shell: pwsh
+        run: >
+          dotnet publish src/MoniMS.App/MoniMS.App.csproj -c Release -r win-x64 --self-contained false
+          -p:Version=$env:VERSION -p:RepositoryUrl=$env:REPO_URL -o publish
+
+      - name: Release notes from CHANGELOG.md
+        shell: pwsh
+        run: |
+          # CHANGELOG.md의 "## [버전]" 절을 잘라서 릴리스 설명으로 사용
+          $text = Get-Content CHANGELOG.md -Raw
+          $pattern = "(?ms)^## \[$([regex]::Escape($env:VERSION))\][^\n]*\n(.*?)(?=^## |\z)"
+          $m = [regex]::Match($text, $pattern)
+          $notes = if ($m.Success) { $m.Groups[1].Value.Trim() } else { "MoniMS $env:VERSION" }
+          Set-Content -Path release-notes.md -Value $notes -Encoding utf8
+
+      - name: Install Velopack CLI
+        run: dotnet tool install -g vpk --version ${{ env.VPK_VERSION }}
+
+      - name: Download previous release (for delta updates)
+        continue-on-error: true # 첫 릴리스에는 이전 버전이 없음
+        shell: pwsh
+        run: vpk download github --repoUrl $env:REPO_URL --token ${{ secrets.GITHUB_TOKEN }} -o Releases
+
+      - name: Pack installer
+        shell: pwsh
+        run: >
+          vpk pack --packId $env:PACK_ID --packVersion $env:VERSION --packDir publish --mainExe MoniMS.exe
+          --packTitle MoniMS --packAuthors Bgg --icon src/MoniMS.App/Assets/moniMS.ico
+          --framework net10.0-x64-desktop --releaseNotes release-notes.md -o Releases
+        # 코드 서명 인증서가 생기면 --signTemplate "..." 을 추가하면 된다.
+
+      - name: Upload to GitHub Release
+        shell: pwsh
+        run: |
+          $a = @('upload', 'github', '--repoUrl', $env:REPO_URL, '--token', '${{ secrets.GITHUB_TOKEN }}',
+                 '--publish', '--releaseName', "MoniMS $env:VERSION", '--tag', '${{ github.ref_name }}', '-o', 'Releases')
+          if ($env:VERSION.Contains('-')) { $a += '--pre' } # v1.1.0-beta.1 같은 태그는 시험판
+          vpk @a

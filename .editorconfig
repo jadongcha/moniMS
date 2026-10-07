@@ -1,0 +1,39 @@
+root = true
+
+[*]
+charset = utf-8
+indent_style = space
+indent_size = 4
+end_of_line = crlf
+insert_final_newline = true
+
+[*.{csproj,props,xaml,json}]
+indent_size = 2
+
+[*.cs]
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_style_var_for_built_in_types = true:suggestion
+dotnet_style_qualification_for_field = false:suggestion
+dotnet_naming_rule.private_fields_underscore.symbols = private_fields
+dotnet_naming_rule.private_fields_underscore.style = underscore_camel
+dotnet_naming_rule.private_fields_underscore.severity = suggestion
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+dotnet_naming_style.underscore_camel.required_prefix = _
+dotnet_naming_style.underscore_camel.capitalization = camel_case
+# 네이티브 API를 많이 써서 아래 분석 규칙은 완화
+dotnet_diagnostic.CA1416.severity = none
+dotnet_diagnostic.CA1401.severity = none
+dotnet_diagnostic.CA1060.severity = none
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.CA1031.severity = none
+dotnet_diagnostic.CA1848.severity = none
+# 로그 인자는 모두 가벼운 값이라 IsEnabled 검사 생략
+dotnet_diagnostic.CA1873.severity = none
+dotnet_diagnostic.CA1805.severity = none
+dotnet_diagnostic.CA1716.severity = none
+dotnet_diagnostic.CA2020.severity = none
+
+[src/MoniMS.App/ViewModels/*.cs]
+# XAML 바인딩 대상 속성은 인스턴스 멤버여야 함
+dotnet_diagnostic.CA1822.severity = none

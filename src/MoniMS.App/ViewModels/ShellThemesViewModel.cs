@@ -1,0 +1,421 @@
+using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.Globalization;
+using System.Windows;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.Logging;
+using MoniMS.Core.Settings;
+using MoniMS.Core.Shell;
+
+namespace MoniMS.App.ViewModels;
+
+public sealed class ThemeListItem(ThemePackage package)
+{
+    public ThemePackage Package { get; } = package;
+    public string Name => Package.Name;
+
+    public string PartsText
+    {
+        get
+        {
+            var parts = Package.Mods.Select(m => WindhawkMods.DisplayName(m.ModId).Split(' ')[0]).ToList();
+            if (Package.Wallpapers.Count > 0)
+                parts.Add($"{Package.Wallpapers.Count} wallpapers");
+            return string.Join(" · ", parts);
+        }
+    }
+
+    public string ImportedText => Package.ImportedAt.ToString("MM-dd HH:mm", CultureInfo.InvariantCulture);
+}
+
+public sealed partial class ThemeModRow(ThemeModConfig config, ModState state) : ObservableObject
+{
+    public ThemeModConfig Config { get; } = config;
+    public string Name => WindhawkMods.DisplayName(Config.ModId);
+    public bool IsInstalled => State != ModState.NotInstalled;
+    public ModState State { get; } = state;
+
+    public string StateText => State switch
+    {
+        ModState.Enabled => $"ready · {Config.SettingCount} settings",
+        ModState.Disabled => "mod is disabled in Windhawk",
+        _ => "mod not installed",
+    };
+
+    [ObservableProperty] private bool _isSelected = state != ModState.NotInstalled;
+}
+
+public sealed class WallpaperThumb(string relativePath, ImageSource? thumbnail)
+{
+    public string RelativePath { get; } = relativePath;
+    public string Name => Path.GetFileNameWithoutExtension(RelativePath);
+    public ImageSource? Thumbnail { get; } = thumbnail;
+}
+
+/// <summary>설정 창 "Taskbar &amp; Start" 탭: 테마 가져오기 / 보관함 / 적용 / 되돌리기.</summary>
+public sealed partial class ShellThemesViewModel : ObservableObject, IDisposable
+{
+    private readonly ThemeLibrary _library;
+    private readonly ThemeImporter _importer;
+    private readonly ThemeApplier _applier;
+    private readonly IWindhawkStorage _storage;
+    private readonly ISettingsStore _settings;
+    private readonly ILogger<ShellThemesViewModel> _logger;
+    private CancellationTokenSource? _thumbsCts;
+
+    public ShellThemesViewModel(ThemeLibrary library, ThemeImporter importer, ThemeApplier applier,
+        IWindhawkStorage storage, ISettingsStore settings, ILogger<ShellThemesViewModel> logger)
+    {
+        _library = library;
+        _importer = importer;
+        _applier = applier;
+        _storage = storage;
+        _settings = settings;
+        _logger = logger;
+        Refresh();
+    }
+
+    // ---------- Windhawk 상태 ----------
+    [ObservableProperty] private bool _isWindhawkInstalled;
+    [ObservableProperty] private string _windhawkStatus = "";
+
+    // ---------- 가져오기 ----------
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ImportCommand))]
+    private string _importText = "";
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ImportCommand), nameof(ApplyCommand), nameof(RestoreCommand))]
+    private bool _isBusy;
+
+    [ObservableProperty] private string _status = "";
+
+    // ---------- 보관함 / 선택 ----------
+    public ObservableCollection<ThemeListItem> Themes { get; } = [];
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSelection))]
+    [NotifyCanExecuteChangedFor(nameof(ApplyCommand), nameof(DeleteThemeCommand), nameof(OpenThemeFolderCommand))]
+    private ThemeListItem? _selectedTheme;
+
+    public bool HasSelection => SelectedTheme is not null;
+
+    public ObservableCollection<ThemeModRow> ModRows { get; } = [];
+    public ObservableCollection<WallpaperThumb> Wallpapers { get; } = [];
+
+    [ObservableProperty] private WallpaperThumb? _selectedWallpaper;
+    [ObservableProperty] private bool _applyWallpaper;
+    [ObservableProperty] private bool _hasCustomScript;
+    [ObservableProperty] private bool _allowCustomScript;
+    /// <summary>null이면 표시 안 함.</summary>
+    [ObservableProperty] private string? _otherItemsText;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RestoreCommand))]
+    private string? _backupLabel;
+
+    partial void OnSelectedThemeChanged(ThemeListItem? value) => LoadDetails(value?.Package);
+
+    partial void OnSelectedWallpaperChanged(WallpaperThumb? value)
+    {
+        if (value is not null)
+            ApplyWallpaper = true;
+    }
+
+    [RelayCommand]
+    private void Refresh()
+    {
+        var selectedId = SelectedTheme?.Package.Id;
+        _storage.CustomAppRoot = _settings.Current.WindhawkPath;
+        var info = _storage.Detect();
+        IsWindhawkInstalled = info.Installed;
+        WindhawkStatus = info.Installed
+            ? $"Windhawk {info.Version ?? ""} found{(info.Portable ? " (portable)" : "")}".Replace("  ", " ")
+            : "Windhawk not found — it is required to restyle the taskbar and Start menu.";
+
+        Themes.Clear();
+        foreach (var p in _library.GetAll())
+            Themes.Add(new ThemeListItem(p));
+        SelectedTheme = Themes.FirstOrDefault(t => t.Package.Id == selectedId) ?? Themes.FirstOrDefault();
+        BackupLabel = _applier.LatestBackupLabel;
+    }
+
+    private void LoadDetails(ThemePackage? package)
+    {
+        ModRows.Clear();
+        Wallpapers.Clear();
+        SelectedWallpaper = null;
+        ApplyWallpaper = false;
+        AllowCustomScript = false;
+        HasCustomScript = false;
+        OtherItemsText = null;
+        _thumbsCts?.Cancel();
+        _thumbsCts?.Dispose();
+        _thumbsCts = null;
+        if (package is null)
+            return;
+
+        foreach (var mod in package.Mods.OrderBy(m => WindhawkMods.All.ToList().IndexOf(m.ModId)))
+            ModRows.Add(new ThemeModRow(mod, _storage.GetModState(mod.ModId)));
+        HasCustomScript = package.Mods.Any(m => m.HasCustomScript);
+        OtherItemsText = package.OtherItems.Count == 0 ? null : string.Join(", ", package.OtherItems);
+
+        // 썸네일은 큰 이미지라 백그라운드에서 디코딩
+        var cts = _thumbsCts = new CancellationTokenSource();
+        var items = package.Wallpapers.ToList();
+        var dispatcher = Application.Current.Dispatcher;
+        _ = Task.Run(() =>
+        {
+            foreach (var rel in items)
+            {
+                if (cts.IsCancellationRequested)
+                    return;
+                var thumb = LoadThumbnail(package.FullPath(rel));
+                dispatcher.BeginInvoke(() =>
+                {
+                    if (!cts.IsCancellationRequested)
+                        Wallpapers.Add(new WallpaperThumb(rel, thumb));
+                });
+            }
+        }, cts.Token);
+    }
+
+    private static BitmapImage? LoadThumbnail(string path)
+    {
+        try
+        {
+            var bmp = new BitmapImage();
+            bmp.BeginInit();
+            bmp.CacheOption = BitmapCacheOption.OnLoad;
+            bmp.DecodePixelWidth = 220;
+            bmp.UriSource = new Uri(path);
+            bmp.EndInit();
+            bmp.Freeze();
+            return bmp;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    // ---------- 가져오기 ----------
+
+    private bool CanImport() => !IsBusy && !string.IsNullOrWhiteSpace(ImportText);
+
+    [RelayCommand(CanExecute = nameof(CanImport))]
+    private async Task ImportAsync()
+    {
+        IsBusy = true;
+        try
+        {
+            var progress = new Progress<string>(s => Status = s);
+            var package = await _importer.ImportAsync(ImportText, progress);
+            ImportText = "";
+            Refresh();
+            SelectedTheme = Themes.FirstOrDefault(t => t.Package.Id == package.Id);
+            Status = $"Imported '{package.Name}': {package.Mods.Count} part(s), {package.Wallpapers.Count} wallpaper(s).";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Theme import failed");
+            Status = "Import failed: " + ex.Message;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    private void BrowseFile()
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Choose a theme package",
+            Filter = "Theme package (*.zip;*.json)|*.zip;*.json|All files (*.*)|*.*",
+        };
+        if (dialog.ShowDialog() == true)
+        {
+            ImportText = dialog.FileName;
+            ImportCommand.Execute(null);
+        }
+    }
+
+    [RelayCommand]
+    private void BrowseFolder()
+    {
+        var dialog = new Microsoft.Win32.OpenFolderDialog { Title = "Choose a theme folder" };
+        if (dialog.ShowDialog() == true)
+        {
+            ImportText = dialog.FolderName;
+            ImportCommand.Execute(null);
+        }
+    }
+
+    [RelayCommand]
+    private static void BrowseOnline() =>
+        OpenUrl("https://github.com/search?q=windhawk+taskbar+theme&type=repositories");
+
+    // ---------- 적용 / 되돌리기 ----------
+
+    private bool CanApply() => !IsBusy && SelectedTheme is not null;
+
+    [RelayCommand(CanExecute = nameof(CanApply))]
+    private async Task ApplyAsync()
+    {
+        var package = SelectedTheme!.Package;
+        var modIds = ModRows.Where(r => r.IsSelected && r.IsInstalled).Select(r => r.Config.ModId).ToList();
+        var wallpaper = ApplyWallpaper ? SelectedWallpaper?.RelativePath ?? package.Wallpapers.FirstOrDefault() : null;
+        if (modIds.Count == 0 && wallpaper is null)
+        {
+            Status = "Nothing selected to apply.";
+            return;
+        }
+
+        IsBusy = true;
+        Status = "Applying...";
+        try
+        {
+            var options = new ThemeApplyOptions(modIds, AllowCustomScript, wallpaper);
+            // 관리자 권한 헬퍼를 기다릴 수 있으므로 UI 스레드 밖에서
+            var result = modIds.Count > 0
+                ? await Task.Run(() => _applier.ApplyMods(package, options))
+                : new ThemeApplyResult([], false, []);
+
+            var wallpaperSet = wallpaper is not null && _applier.ApplyWallpaper(package, wallpaper);
+
+            var parts = result.AppliedMods.Select(WindhawkMods.DisplayName).ToList();
+            if (wallpaperSet)
+                parts.Add("wallpaper");
+            Status = (parts.Count > 0 ? $"Applied: {string.Join(", ", parts)}. Changes appear in a few seconds." : "Nothing was applied.")
+                     + (result.Warnings.Count > 0 ? "\n" + string.Join("\n", result.Warnings) : "");
+        }
+        catch (OperationCanceledException ex)
+        {
+            Status = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Theme apply failed");
+            Status = "Apply failed: " + ex.Message;
+        }
+        finally
+        {
+            IsBusy = false;
+            BackupLabel = _applier.LatestBackupLabel;
+            LoadDetails(package); // 모드 상태 갱신
+        }
+    }
+
+    private bool CanRestore() => !IsBusy && BackupLabel is not null;
+
+    [RelayCommand(CanExecute = nameof(CanRestore))]
+    private async Task RestoreAsync()
+    {
+        if (MessageBox.Show($"Restore the Windhawk settings saved {BackupLabel}?", "MoniMS",
+                MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            return;
+        IsBusy = true;
+        try
+        {
+            var mods = await Task.Run(_applier.RestoreLatest);
+            Status = $"Restored: {string.Join(", ", mods.Select(WindhawkMods.DisplayName))}.";
+        }
+        catch (OperationCanceledException ex)
+        {
+            Status = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Theme restore failed");
+            Status = "Restore failed: " + ex.Message;
+        }
+        finally
+        {
+            IsBusy = false;
+            BackupLabel = _applier.LatestBackupLabel;
+        }
+    }
+
+    // ---------- 보관함 관리 ----------
+
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private void DeleteTheme()
+    {
+        var p = SelectedTheme!.Package;
+        if (MessageBox.Show($"Remove '{p.Name}' from the library?\nWindhawk settings already applied stay as they are.", "MoniMS",
+                MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            return;
+        try
+        {
+            _thumbsCts?.Cancel();
+            _library.Delete(p);
+            SelectedTheme = null;
+            Refresh();
+        }
+        catch (Exception ex)
+        {
+            Status = "Delete failed: " + ex.Message;
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private void OpenThemeFolder() =>
+        Process.Start(new ProcessStartInfo("explorer.exe", $"\"{SelectedTheme!.Package.FilesDirectory}\"") { UseShellExecute = true });
+
+    // ---------- Windhawk ----------
+
+    [RelayCommand]
+    private static void GetWindhawk() => OpenUrl("https://windhawk.net/");
+
+    [RelayCommand]
+    private void InstallMod(ThemeModRow? row)
+    {
+        if (row is null)
+            return;
+        // 최신 Windhawk는 windhawk:// 링크로 모드 페이지를 연다. 안 되면 웹 페이지.
+        if (!OpenUrl(WindhawkMods.InstallLink(row.Config.ModId)))
+            OpenUrl(WindhawkMods.WebLink(row.Config.ModId));
+        Status = $"Install '{row.Name}' in Windhawk, then press ↻ to refresh.";
+    }
+
+    [RelayCommand]
+    private void LocateWindhawk()
+    {
+        var dialog = new Microsoft.Win32.OpenFolderDialog { Title = "Choose the Windhawk folder (contains windhawk.ini)" };
+        if (dialog.ShowDialog() != true)
+            return;
+        if (!File.Exists(Path.Combine(dialog.FolderName, "windhawk.ini")))
+        {
+            Status = "That folder has no windhawk.ini.";
+            return;
+        }
+        _settings.Current.WindhawkPath = dialog.FolderName;
+        _settings.Save();
+        Refresh();
+    }
+
+    public void Dispose()
+    {
+        _thumbsCts?.Cancel();
+        _thumbsCts?.Dispose();
+        _thumbsCts = null;
+    }
+
+    private static bool OpenUrl(string url)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+}

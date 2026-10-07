@@ -1,0 +1,23 @@
+# 푸시/PR마다 빌드와 테스트만 확인한다.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Build
+        run: dotnet build MoniMS.sln -c Release
+
+      - name: Test
+        run: dotnet test MoniMS.sln -c Release --no-build
