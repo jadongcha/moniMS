@@ -6,68 +6,81 @@ namespace MoniMS.Core.SystemInfo;
 /// <summary>
 /// "GPU Engine" 성능 카운터로 GPU 사용률을 계산한다.
 /// 작업 관리자 방식: 엔진별(프로세스 합산) 사용률 중 최댓값.
-/// 프로세스가 생기고 사라지므로 인스턴스 목록은 주기적으로 갱신한다.
+/// 인스턴스(프로세스×엔진)가 수백 개라서 인스턴스마다 PerformanceCounter를 두면
+/// 매번 카테고리 전체를 인스턴스 수만큼 다시 읽게 된다 (틱당 ~1초, 78MB 할당).
+/// 그래서 틱마다 카테고리를 한 번만 읽고(ReadCategory) 이전 샘플과의 차이로 직접 계산한다.
 /// </summary>
-internal sealed partial class GpuUsageProvider : IDisposable
+internal sealed partial class GpuUsageProvider
 {
-    private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(10);
+    private const string EngineCounter = "Utilization Percentage";
+    private const string MemoryCounter = "Dedicated Usage";
 
-    private readonly Dictionary<string, PerformanceCounter> _engineCounters = new();
-    private readonly Dictionary<string, PerformanceCounter> _memoryCounters = new();
-    private DateTime _lastRefresh = DateTime.MinValue;
-    private readonly bool _available;
+    private readonly PerformanceCounterCategory? _engines;
+    private readonly PerformanceCounterCategory? _memory;
+    private Dictionary<string, CounterSample> _previous = new();
 
     public GpuUsageProvider()
     {
-        try
-        {
-            _available = PerformanceCounterCategory.Exists("GPU Engine");
-        }
-        catch (Exception)
-        {
-            _available = false;
-        }
+        _engines = TryOpen("GPU Engine");
+        _memory = TryOpen("GPU Adapter Memory");
     }
 
     public (double? Percent, ulong? DedicatedUsed) Read()
     {
-        if (!_available)
+        if (_engines is null)
             return (null, null);
 
-        if (DateTime.UtcNow - _lastRefresh > RefreshInterval)
-            RefreshInstances();
+        InstanceDataCollection engines;
+        try
+        {
+            engines = _engines.ReadCategory()[EngineCounter];
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            _previous.Clear();
+            return (null, null);
+        }
 
+        // 사라진 프로세스는 이번 샘플에 없으므로 이전 샘플 목록도 매번 새로 만든다
+        var current = new Dictionary<string, CounterSample>(_previous.Count);
         var perEngine = new Dictionary<string, double>();
-        foreach (var (instance, counter) in _engineCounters)
+        if (engines is not null)
         {
-            float value;
-            try
+            foreach (InstanceData data in engines.Values)
             {
-                value = counter.NextValue();
-            }
-            catch (InvalidOperationException)
-            {
-                continue; // 프로세스가 종료된 인스턴스
-            }
-            var key = EngineKey(instance);
-            perEngine[key] = perEngine.GetValueOrDefault(key) + value;
-        }
-
-        ulong? dedicated = null;
-        foreach (var counter in _memoryCounters.Values)
-        {
-            try
-            {
-                var v = (ulong)counter.NextValue();
-                dedicated = Math.Max(dedicated ?? 0, v);
-            }
-            catch (InvalidOperationException)
-            {
+                var sample = data.Sample;
+                current[data.InstanceName] = sample;
+                if (!_previous.TryGetValue(data.InstanceName, out var old))
+                    continue; // 새 인스턴스: 다음 틱부터 계산
+                var key = EngineKey(data.InstanceName);
+                perEngine[key] = perEngine.GetValueOrDefault(key) + Math.Max(0, CounterSample.Calculate(old, sample));
             }
         }
+        _previous = current;
 
         var percent = perEngine.Count == 0 ? 0 : Math.Clamp(perEngine.Values.Max(), 0, 100);
-        return (percent, dedicated);
+        return (percent, ReadDedicatedMemory());
+    }
+
+    /// <summary>어댑터별 전용 메모리 사용량 중 최댓값 (원시 값이라 이전 샘플이 필요 없다).</summary>
+    private ulong? ReadDedicatedMemory()
+    {
+        if (_memory is null)
+            return null;
+        try
+        {
+            ulong? dedicated = null;
+            if (_memory.ReadCategory()[MemoryCounter] is { } memory)
+            {
+                foreach (InstanceData data in memory.Values)
+                    dedicated = Math.Max(dedicated ?? 0, (ulong)Math.Max(0, data.RawValue));
+            }
+            return dedicated;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            return null;
+        }
     }
 
     /// <summary>"pid_123_luid_0x0_0xABC_phys_0_eng_3_engtype_3D" → "luid_0x0_0xABC_phys_0_eng_3"</summary>
@@ -80,50 +93,15 @@ internal sealed partial class GpuUsageProvider : IDisposable
     [GeneratedRegex(@"luid_0x[0-9A-Fa-f]+_0x[0-9A-Fa-f]+_phys_\d+_eng_\d+")]
     private static partial Regex EngineKeyRegex();
 
-    private void RefreshInstances()
+    private static PerformanceCounterCategory? TryOpen(string category)
     {
-        _lastRefresh = DateTime.UtcNow;
-        Sync(_engineCounters, "GPU Engine", "Utilization Percentage", _ => true);
-        Sync(_memoryCounters, "GPU Adapter Memory", "Dedicated Usage", _ => true);
-    }
-
-    private static void Sync(Dictionary<string, PerformanceCounter> map, string category, string counterName, Func<string, bool> filter)
-    {
-        string[] names;
         try
         {
-            names = new PerformanceCounterCategory(category).GetInstanceNames();
+            return PerformanceCounterCategory.Exists(category) ? new PerformanceCounterCategory(category) : null;
         }
         catch (Exception)
         {
-            return;
+            return null;
         }
-
-        var current = new HashSet<string>(names.Where(filter));
-        foreach (var stale in map.Keys.Where(k => !current.Contains(k)).ToList())
-        {
-            map[stale].Dispose();
-            map.Remove(stale);
-        }
-        foreach (var name in current.Where(n => !map.ContainsKey(n)))
-        {
-            try
-            {
-                var c = new PerformanceCounter(category, counterName, name, readOnly: true);
-                c.NextValue();
-                map[name] = c;
-            }
-            catch (Exception)
-            {
-            }
-        }
-    }
-
-    public void Dispose()
-    {
-        foreach (var c in _engineCounters.Values) c.Dispose();
-        foreach (var c in _memoryCounters.Values) c.Dispose();
-        _engineCounters.Clear();
-        _memoryCounters.Clear();
     }
 }

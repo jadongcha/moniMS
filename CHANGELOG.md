@@ -6,7 +6,7 @@ Write upcoming changes under **[Unreleased]**; `release.ps1` moves them into the
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-10-08
+## [0.2.1] - 2026-10-08
 
 ### Added
 - Themes can now restyle **Windows Terminal** (color schemes, font, opacity, padding; your profiles and key bindings are kept).
@@ -18,12 +18,18 @@ Write upcoming changes under **[Unreleased]**; `release.ps1` moves them into the
 - Importing a file that is not a theme now shows an **Invalid file format** warning.
 
 ### Changed
+- The info widget now takes up the same share of the screen on every resolution and scaling (based on how it looks on a 2880×1800 screen at 200%).
+- The info widget is narrower by default: 33% of the screen width instead of 38%.
+- The info widget is taller by default: 77% of the screen height instead of 72%.
 - The "Taskbar & Start" tab is now called **Themes**.
 - **Restore** also undoes Terminal and Discord changes.
 - Themes imported with an older version are re-analyzed automatically.
 
 ### Fixed
+- The info widget could stay too small after changing the screen resolution or scaling.
 - **Install mod** opened an empty editor window on Windhawk 1.x. It now opens the mod's page on windhawk.net and tells you what to search for in Windhawk.
+- MoniMS used a lot of CPU in the background (up to half a CPU core when many apps use the GPU), and the widget then updated only every 2 seconds. It now uses well under 1% CPU and about 100 MB less memory, and updates every second again.
+- The local IP in the widget did not update when it changed on the same network adapter.
 
 ## [0.1.0] - 2026-10-08
 

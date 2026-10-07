@@ -43,9 +43,15 @@ public sealed class SettingsStore : ISettingsStore
             return false;
         if (settings.Version < 2)
         {
-            // v2: 위젯 기본 크기 550 x 650
-            settings.Widget.Width = 550;
-            settings.Widget.Height = 650;
+            // v2: 위젯 기본 크기 지정
+            settings.Widget.Width = WidgetLayout.DefaultWidth;
+            settings.Widget.Height = WidgetLayout.DefaultHeight;
+        }
+        if (settings.Version < 5)
+        {
+            // v3: 기본 너비 550 → 478 (화면 가로 비율 38.2% → 33.2%)
+            // v5: 기본 높이 650 → 695 (화면 세로 비율 72.2% → 77.2%). v4에서 잠깐 쓴 830도 되돌림.
+            settings.Widget.UpgradeLegacySize();
         }
         settings.Version = AppSettings.CurrentVersion;
         return true;

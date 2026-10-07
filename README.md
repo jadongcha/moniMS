@@ -22,6 +22,7 @@ Get **`MoniMS-win-Setup.exe`** from the [latest release](../../releases/latest) 
 A clean widget that sits on your desktop, behind your windows.
 
 - **What it shows:** CPU, RAM and GPU usage with 60-second graphs, used and free space per drive, local IP and download/upload speed, Windows version and build, CPU/GPU/board names, and uptime.
+- **Same size on every screen:** the widget takes up the same share of the screen on any resolution or scaling.
 - **Always click-through:** icons and files behind the widget stay clickable. Turn on **Edit position** (tray menu or Settings) to drag it somewhere else.
 - **Styles:** Dark, Light, Glass.
 - **Customizable:** background opacity (text stays sharp), font (JetBrains Mono built in), graph color, and which sections to show and in what order.

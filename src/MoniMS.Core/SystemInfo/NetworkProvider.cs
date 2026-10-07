@@ -5,19 +5,30 @@ using System.Net.Sockets;
 namespace MoniMS.Core.SystemInfo;
 
 /// <summary>기본 게이트웨이가 있는 활성 어댑터를 "주 네트워크"로 보고 IP와 속도를 측정한다.</summary>
-internal sealed class NetworkProvider
+internal sealed class NetworkProvider : IDisposable
 {
-    private static readonly TimeSpan ReselectInterval = TimeSpan.FromSeconds(10);
+    /// <summary>
+    /// 어댑터 전체 조회는 비싸서(수십 ms) 네트워크 변경 알림이 올 때만 다시 고른다.
+    /// 알림을 놓치는 경우에 대비해 가끔은 그냥 다시 고른다.
+    /// </summary>
+    private static readonly TimeSpan ReselectInterval = TimeSpan.FromSeconds(60);
 
     private NetworkInterface? _primary;
     private DateTime _lastSelect = DateTime.MinValue;
+    private volatile bool _changed = true;
     private long _lastRx;
     private long _lastTx;
     private readonly Stopwatch _sw = new();
 
+    public NetworkProvider()
+    {
+        NetworkChange.NetworkAddressChanged += OnNetworkChanged;
+        NetworkChange.NetworkAvailabilityChanged += OnNetworkChanged;
+    }
+
     public NetworkStatus? Read()
     {
-        if (_primary is null || DateTime.UtcNow - _lastSelect > ReselectInterval)
+        if (_changed || _primary is null || DateTime.UtcNow - _lastSelect > ReselectInterval)
             Select();
 
         if (_primary is null)
@@ -40,6 +51,7 @@ internal sealed class NetworkProvider
             _lastRx = rx;
             _lastTx = tx;
 
+            // GetIPProperties()는 Select() 시점의 값이라 주소가 바뀌면 변경 알림 → 다시 고르기로 갱신된다
             var props = _primary.GetIPProperties();
             var ipv4 = props.UnicastAddresses
                 .FirstOrDefault(a => a.Address.AddressFamily == AddressFamily.InterNetwork)?.Address.ToString();
@@ -55,8 +67,11 @@ internal sealed class NetworkProvider
         }
     }
 
+    private void OnNetworkChanged(object? sender, EventArgs e) => _changed = true;
+
     private void Select()
     {
+        _changed = false;
         _lastSelect = DateTime.UtcNow;
         var candidate = NetworkInterface.GetAllNetworkInterfaces()
             .Where(n => n.OperationalStatus == OperationalStatus.Up
@@ -67,9 +82,13 @@ internal sealed class NetworkProvider
             .FirstOrDefault();
 
         if (candidate?.Id != _primary?.Id)
-        {
-            _primary = candidate;
             _lastRx = _lastTx = 0; // 어댑터가 바뀌면 속도 계산 리셋
-        }
+        _primary = candidate; // 같은 어댑터여도 새 IP 정보를 쓰도록 항상 교체
+    }
+
+    public void Dispose()
+    {
+        NetworkChange.NetworkAddressChanged -= OnNetworkChanged;
+        NetworkChange.NetworkAvailabilityChanged -= OnNetworkChanged;
     }
 }

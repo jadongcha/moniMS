@@ -46,10 +46,32 @@ public class SettingsMigrationTests
     {
         var s = new MoniMS.Core.Settings.AppSettings { Widget = new WidgetLayout { Width = 320, Height = 300 } };
         Assert.True(MoniMS.Core.Settings.SettingsStore.Migrate(s));
-        Assert.Equal((550d, 650d), (s.Widget.Width, s.Widget.Height));
+        Assert.Equal((478d, 695d), (s.Widget.Width, s.Widget.Height));
         Assert.False(MoniMS.Core.Settings.SettingsStore.Migrate(s)); // 한 번만
     }
 
     [Fact]
-    public void Defaults_are_550_by_650() => Assert.Equal((550d, 650d), (new WidgetLayout().Width, new WidgetLayout().Height));
+    public void Defaults_are_478_by_695() => Assert.Equal((478d, 695d), (new WidgetLayout().Width, new WidgetLayout().Height));
+
+    [Fact]
+    public void Old_default_width_is_upgraded_but_custom_width_is_kept()
+    {
+        var s = new MoniMS.Core.Settings.AppSettings { Version = 2 };
+        s.Widget.Width = 550;
+        s.Widget.Height = 650;
+        Assert.True(MoniMS.Core.Settings.SettingsStore.Migrate(s));
+        Assert.Equal((478d, 695d), (s.Widget.Width, s.Widget.Height));
+
+        var custom = new WidgetLayout { Width = 600 };
+        Assert.False(custom.UpgradeLegacySize());
+        Assert.Equal(600d, custom.Width);
+    }
+
+    [Fact]
+    public void Default_widget_takes_33_percent_of_the_screen_width()
+    {
+        var (w, h, _) = WidgetSizing.Fit(WidgetLayout.DefaultWidth, WidgetLayout.DefaultHeight, 1, 1920, 1080, 1.0);
+        Assert.Equal(0.332, w / 1920, 3);
+        Assert.Equal(0.772, h / 1080, 3);
+    }
 }

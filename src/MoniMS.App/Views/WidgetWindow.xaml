@@ -7,7 +7,7 @@
         Title="MoniMS Widget"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ShowInTaskbar="False" ShowActivated="False" ResizeMode="NoResize" Topmost="False"
-        Width="{Binding WindowWidth}" Height="{Binding WindowHeight}"
+        Width="478" Height="695"
         UseLayoutRounding="True" TextOptions.TextFormattingMode="Display">
 
     <Window.Resources>
@@ -161,7 +161,7 @@
                 BorderBrush="{DynamicResource WidgetBorder}" BorderThickness="1"
                 TextElement.Foreground="{DynamicResource WidgetForeground}">
             <Border.LayoutTransform>
-                <ScaleTransform ScaleX="{Binding Scale}" ScaleY="{Binding Scale}" />
+                <ScaleTransform ScaleX="{Binding ContentScale}" ScaleY="{Binding ContentScale}" />
             </Border.LayoutTransform>
             <ItemsControl ItemsSource="{Binding Sections}" Focusable="False" />
         </Border>

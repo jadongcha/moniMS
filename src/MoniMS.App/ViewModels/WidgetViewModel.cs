@@ -20,24 +20,41 @@ public sealed partial class WidgetViewModel : ObservableObject
 
     public ObservableCollection<SectionViewModel> Sections { get; } = [];
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(WindowWidth))]
-    private double _width = 550;
+    private (double Width, double Height, double Dpi) _screen;
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(WindowHeight))]
-    private double _height = 650;
+    /// <summary>레이아웃 크기 (기준 화면 2880×1800에서의 크기, DIP).</summary>
+    [ObservableProperty] private double _width = WidgetLayout.DefaultWidth;
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(WindowWidth), nameof(WindowHeight))]
-    private double _scale = 1.0;
+    [ObservableProperty] private double _height = WidgetLayout.DefaultHeight;
+
+    /// <summary>사용자 배율 (레이아웃 값).</summary>
+    [ObservableProperty] private double _scale = 1.0;
+
+    /// <summary>실제 창 크기 (DIP). 모니터 해상도에 맞춰 WidgetController가 계산한다.</summary>
+    [ObservableProperty] private double _windowWidth = WidgetLayout.DefaultWidth;
+
+    [ObservableProperty] private double _windowHeight = WidgetLayout.DefaultHeight;
+
+    /// <summary>내용 배율 (화면 비율 맞춤 × 사용자 배율).</summary>
+    [ObservableProperty] private double _contentScale = 1.0;
 
     [ObservableProperty] private double _opacity = 0.92;
     [ObservableProperty] private bool _isEditMode;
 
-    public double WindowWidth => Width * Scale;
+    /// <summary>모니터 해상도·배율에 맞춰 창 크기와 내용 배율을 정한다.</summary>
+    public void FitToScreen(double screenWidth, double screenHeight, double dpiScale)
+    {
+        _screen = (screenWidth, screenHeight, dpiScale);
+        Recalculate();
+    }
 
-    public double WindowHeight => Height * Scale;
+    private void Recalculate()
+    {
+        var (w, h, s) = WidgetSizing.Fit(Width, Height, Scale, _screen.Width, _screen.Height, _screen.Dpi);
+        WindowWidth = w;
+        WindowHeight = h;
+        ContentScale = s;
+    }
 
     public void ApplyLayout(WidgetLayout layout)
     {
@@ -56,6 +73,7 @@ public sealed partial class WidgetViewModel : ObservableObject
             if (_monitor.Latest is { } latest)
                 Refresh(latest);
         }
+        Recalculate();
     }
 
     private void OnSnapshot(object? sender, SystemSnapshot snapshot) =>

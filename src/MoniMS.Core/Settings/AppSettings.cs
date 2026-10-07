@@ -5,7 +5,7 @@ namespace MoniMS.Core.Settings;
 /// <summary>앱 전역 설정 (%APPDATA%\MoniMS\settings.json).</summary>
 public sealed class AppSettings
 {
-    public const int CurrentVersion = 2;
+    public const int CurrentVersion = 5;
 
     /// <summary>설정 파일 형식 버전. 기본값 0 = 버전 정보가 없던 예전 파일.</summary>
     public int Version { get; set; }

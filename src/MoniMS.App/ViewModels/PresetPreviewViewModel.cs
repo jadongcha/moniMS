@@ -116,8 +116,12 @@ public sealed class PresetPreviewViewModel
         if (preset.Widget is { } w)
         {
             hasWidget = w.Visible;
-            ww = w.Width * w.Scale * dpiScale;
-            wh = w.Height * w.Scale * dpiScale;
+            // 실제 위젯과 같은 규칙: 화면에서 차지하는 비율이 해상도와 관계없이 같음
+            var sized = w.Clone();
+            sized.UpgradeLegacySize(); // 적용할 때와 같은 크기로 미리보기
+            var (fw, fh, _) = WidgetSizing.Fit(sized.Width, sized.Height, sized.Scale, width, height, dpiScale);
+            ww = fw * dpiScale;
+            wh = fh * dpiScale;
             if (double.IsNaN(w.Left) || double.IsNaN(w.Top))
             {
                 wl = width - ww - 24 * dpiScale; // 기본 위치: 오른쪽 위

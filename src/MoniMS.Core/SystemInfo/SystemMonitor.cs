@@ -127,6 +127,6 @@ public sealed class SystemMonitor : ISystemMonitor
     {
         Stop();
         _cpu?.Dispose();
-        _gpu?.Dispose();
+        _network.Dispose();
     }
 }

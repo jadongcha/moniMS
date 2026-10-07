@@ -131,8 +131,15 @@ public sealed class WidgetLayout
     public bool Visible { get; set; } = true;
     public double Left { get; set; } = double.NaN;
     public double Top { get; set; } = double.NaN;
-    public double Width { get; set; } = 550;
-    public double Height { get; set; } = 650;
+    /// <summary>기본 너비: 기준 화면(2880×1800, 200%)에서 가로 33.2% (예전 550 = 38.2%에서 5%p 줄임).</summary>
+    public const double DefaultWidth = 478;
+    /// <summary>기본 높이: 기준 화면에서 세로 77.2% (예전 650 = 72.2%에서 5%p 늘림).</summary>
+    public const double DefaultHeight = 695;
+    private const double LegacyDefaultWidth = 550;
+    private static readonly double[] LegacyDefaultHeights = [650, 830];
+
+    public double Width { get; set; } = DefaultWidth;
+    public double Height { get; set; } = DefaultHeight;
     /// <summary>배경만의 불투명도 (0 = 완전 투명, 1 = 불투명). 글자는 영향 없음.</summary>
     public double Opacity { get; set; } = 0.92;
     public double Scale { get; set; } = 1.0;
@@ -150,6 +157,23 @@ public sealed class WidgetLayout
         WidgetSection.System, WidgetSection.Cpu, WidgetSection.Memory, WidgetSection.Gpu,
         WidgetSection.Disk, WidgetSection.Network, WidgetSection.Uptime,
     ];
+
+    /// <summary>예전 기본 크기(550 너비, 650·830 높이)로 저장된 레이아웃(설정·프리셋)을 지금 기본값으로. 바꿨으면 true.</summary>
+    public bool UpgradeLegacySize()
+    {
+        var changed = false;
+        if (Width == LegacyDefaultWidth)
+        {
+            Width = DefaultWidth;
+            changed = true;
+        }
+        if (LegacyDefaultHeights.Contains(Height))
+        {
+            Height = DefaultHeight;
+            changed = true;
+        }
+        return changed;
+    }
 
     public WidgetLayout Clone()
     {
