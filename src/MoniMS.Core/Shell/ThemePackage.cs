@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using MoniMS.Core.Shell.Apps;
 
 namespace MoniMS.Core.Shell;
 
@@ -8,7 +9,10 @@ namespace MoniMS.Core.Shell;
 /// </summary>
 public sealed class ThemePackage
 {
-    public int SchemaVersion { get; set; } = 1;
+    /// <summary>2: 앱 테마(Apps) 추가. 이보다 낮은 매니페스트는 불러올 때 다시 분석한다.</summary>
+    public const int CurrentSchemaVersion = 2;
+
+    public int SchemaVersion { get; set; } = CurrentSchemaVersion;
     public string Id { get; set; } = "";
     public string Name { get; set; } = "";
     public string Source { get; set; } = "";
@@ -23,7 +27,10 @@ public sealed class ThemePackage
     /// <summary>files\ 기준 상대 경로.</summary>
     public List<string> Wallpapers { get; set; } = [];
 
-    /// <summary>이 앱이 적용하지 않는 다른 프로그램용 설정 (Terminal, Discord ...).</summary>
+    /// <summary>Windhawk 밖의 앱 테마 (Windows Terminal, Discord).</summary>
+    public List<ThemeAppConfig> Apps { get; set; } = [];
+
+    /// <summary>이 앱이 적용하지 않는 다른 프로그램용 설정 (Spicetify, Komorebi ...).</summary>
     public List<string> OtherItems { get; set; } = [];
 
     [JsonIgnore]

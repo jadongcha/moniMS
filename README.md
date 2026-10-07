@@ -1,6 +1,6 @@
 # MoniMS
 
-**A desktop companion for Windows 11:** switchable desktop presets, a live system-info widget, and one-click taskbar & Start menu themes.
+**A desktop companion for Windows 11:** switchable desktop presets, a live system-info widget, and one-click themes for the taskbar, Start menu, Windows Terminal and Discord.
 
 [한국어 안내 →](README.ko.md)
 
@@ -35,17 +35,26 @@ Save your whole desktop look and switch between looks in one click.
 > Icon layouts restore **positions only**. Files or shortcuts you deleted from the desktop are not recreated.
 > For icon layouts to stick, turn off desktop right-click → **View → Auto arrange icons**.
 
-### 🧩 Taskbar & Start menu themes
-Restyle the Windows 11 taskbar, Start menu and notification center with themes shared online, for example *Gruvbox Material*.
+### 🧩 Themes: taskbar, Start menu, Terminal & Discord
+Restyle Windows with themes shared online, for example *Gruvbox Material*. One theme package can restyle several things at once:
 
-1. Install **[Windhawk](https://windhawk.net)**. It does the low-level work of restyling Windows.
-2. In **Settings → Taskbar & Start**, paste a GitHub link, a `.zip` link, or browse to a local file, then press **Import**.
-3. Choose which parts to apply. You can also pick one of the theme's wallpapers.
-4. Press **Apply**. Windows asks for permission once.
+| Part | What MoniMS changes | You need |
+|---|---|---|
+| Taskbar, Start menu, notification center | Windhawk mod settings | **[Windhawk](https://windhawk.net)** and the mods the theme uses |
+| Windows Terminal | Adds the color schemes and look (font, opacity, padding) to your settings. Your profiles and key bindings are kept. | Windows Terminal |
+| Discord | Puts the `.theme.css` into your client mod's theme folder and turns it on | **Vencord**, Vesktop, Equicord or BetterDiscord (plain Discord can't load themes) |
 
-- **Missing Windhawk mods:** if a part needs a Windhawk mod you don't have, MoniMS shows an **Install mod** link.
-- **Undo:** your previous settings are backed up automatically. Press **Restore** to undo.
+1. In **Settings → Themes**, paste a GitHub link, a `.zip` link, or browse to a local file (`.zip`, `.json`, `.css` or a folder), then press **Import**.
+2. Tick the parts you want. You can also pick one of the theme's wallpapers.
+3. Press **Apply**. Windows asks for permission once if Windhawk settings change.
+
+- **Missing pieces:** if a part needs something you don't have, MoniMS shows a link to get it (**Install mod**, **Get Terminal**, **Get Vencord**).
+- **Fonts:** themes often use a specific font (Gruvbox uses *JetBrainsMono Nerd Font* and *DM Mono*). If it isn't installed, MoniMS keeps your current font and tells you.
+- **Discord:** fully quit Discord (also from the tray) and open it again after applying.
+- **Undo:** everything MoniMS changes is backed up first. Press **Restore** to undo the last apply, or **Reset** (next to ↻ above the library) to go back to how Windows looked before you applied any theme, wallpaper included.
 - **Custom scripts:** themes that contain custom scripts are applied without them, unless you allow the scripts.
+
+> Discord client mods are not allowed by Discord's Terms of Service. MoniMS never installs them; it only uses one you already have.
 
 ## Using MoniMS
 
@@ -67,6 +76,8 @@ Restyle the Windows 11 taskbar, Start menu and notification center with themes s
 | Widget disappeared after Explorer crashed | It comes back within a few seconds. If not, toggle **Show widget** in the tray menu. |
 | Icon layout didn't restore | Turn off **Auto arrange icons**, then apply the preset again. |
 | Theme applied but nothing changed | Make sure the matching mod is installed **and enabled** in Windhawk. |
+| Terminal colors didn't change in one profile | That profile has its own color scheme. Clear it in Terminal → Settings → that profile → Appearance. |
+| Discord theme not showing | Fully quit Discord and reopen it. In Vencord, check **Settings → Themes**. |
 | Something else | Check `%APPDATA%\MoniMS\logs\moniMS.log` and [open an issue](../../issues). |
 
 ## Building from source

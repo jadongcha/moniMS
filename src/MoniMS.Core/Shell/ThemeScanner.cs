@@ -1,8 +1,9 @@
 using System.Text.Json;
+using MoniMS.Core.Shell.Apps;
 
 namespace MoniMS.Core.Shell;
 
-/// <summary>압축 해제된 테마 폴더를 훑어서 Windhawk 설정 파일·배경화면·기타 항목을 찾는다.</summary>
+/// <summary>압축 해제된 테마 폴더를 훑어서 Windhawk 설정 파일·앱 테마·배경화면·기타 항목을 찾는다.</summary>
 public static class ThemeScanner
 {
     private static readonly string[] ImageExtensions = [".png", ".jpg", ".jpeg", ".bmp", ".webp"];
@@ -18,6 +19,7 @@ public static class ThemeScanner
         package.Mods.Clear();
         package.Wallpapers.Clear();
         package.OtherItems.Clear();
+        package.Apps.Clear();
 
         var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var all = SafeEnumerate(root).ToList();
@@ -26,7 +28,21 @@ public static class ThemeScanner
         {
             var settings = TryReadFlatSettings(file);
             if (settings is null || settings.Count == 0)
+            {
+                // Windhawk 형식이 아니면 Windows Terminal 설정/색 구성표인지 확인
+                if (!package.Apps.Any(a => a.Kind == AppThemeKind.WindowsTerminal) &&
+                    WindowsTerminalThemer.TryLoadSource(file) is { } terminal)
+                {
+                    package.Apps.Add(new ThemeAppConfig
+                    {
+                        Kind = AppThemeKind.WindowsTerminal,
+                        SourceFile = Path.GetRelativePath(files, file),
+                        Summary = WindowsTerminalThemer.Summarize(terminal),
+                    });
+                    used.Add(Path.GetDirectoryName(file)!);
+                }
                 continue;
+            }
             var modId = DetectMod(Path.GetFileName(file), settings);
             if (modId is null || package.Mods.Any(m => m.ModId == modId))
                 continue;
@@ -39,6 +55,22 @@ public static class ThemeScanner
                 HasCustomScript = HasCustomScript(settings),
             });
             used.Add(Path.GetDirectoryName(file)!);
+        }
+
+        // Discord 테마 (.theme.css): .theme.css를 먼저, 그다음 이름순
+        var discord = all.Where(f => f.EndsWith(".css", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(f => f.EndsWith(".theme.css", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+            .ThenBy(f => f, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault(f => DiscordThemer.LooksLikeDiscordTheme(Path.GetRelativePath(root, f), f));
+        if (discord is not null)
+        {
+            package.Apps.Add(new ThemeAppConfig
+            {
+                Kind = AppThemeKind.Discord,
+                SourceFile = Path.GetRelativePath(files, discord),
+                Summary = DiscordThemer.ReadThemeName(discord) is { } n ? $"theme '{n}'" : Path.GetFileName(discord),
+            });
+            used.Add(Path.GetDirectoryName(discord)!);
         }
 
         foreach (var file in all.Where(IsImage).Where(f => Path.GetRelativePath(root, f).Contains("wallpaper", StringComparison.OrdinalIgnoreCase))

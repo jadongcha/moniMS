@@ -280,7 +280,7 @@
             </TabItem>
 
             <!-- ===== 작업표시줄 / 시작 메뉴 (Windhawk 테마) ===== -->
-            <TabItem Header="Taskbar &amp; Start">
+            <TabItem Header="Themes">
                 <Grid DataContext="{Binding Shell}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="300" />
@@ -292,9 +292,33 @@
                     <Border Style="{StaticResource Card}">
                         <DockPanel>
                             <StackPanel DockPanel.Dock="Top">
-                                <TextBlock Text="Import a theme" Style="{StaticResource SectionTitle}" />
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                    <TextBlock Text="Import a theme" Style="{StaticResource SectionTitle}" Margin="0" VerticalAlignment="Center" />
+                                    <!-- 정보 아이콘: 마우스를 올리면 가져올 수 있는 파일 안내 -->
+                                    <Border Width="16" Height="16" CornerRadius="8" Margin="6,1,0,0" VerticalAlignment="Center"
+                                            BorderThickness="1.2" BorderBrush="{DynamicResource SubtleTextBrush}" Background="Transparent"
+                                            Cursor="Help" ToolTipService.InitialShowDelay="100" ToolTipService.ShowDuration="30000">
+                                        <TextBlock Text="i" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource SubtleTextBrush}"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-1,0,0" />
+                                        <Border.ToolTip>
+                                            <ToolTip MaxWidth="300">
+                                                <StackPanel>
+                                                    <TextBlock Text="Only theme setting files can be imported" FontWeight="SemiBold" Margin="0,0,0,4" />
+                                                    <TextBlock TextWrapping="Wrap" FontSize="11.5">
+                                                        <Run Text="• Windhawk style settings (.json) for the Windows 11 Taskbar / Start menu / Notification center stylers and Resource Redirect" /><LineBreak />
+                                                        <Run Text="• Windows Terminal settings.json or a color scheme (.json)" /><LineBreak />
+                                                        <Run Text="• Discord themes (.theme.css)" /><LineBreak />
+                                                        <Run Text="• Wallpapers inside a theme package" />
+                                                    </TextBlock>
+                                                    <TextBlock TextWrapping="Wrap" FontSize="11" Margin="0,6,0,0" Opacity="0.75"
+                                                               Text="Accepted as a GitHub link, .zip, folder, .json or .css. Anything else is rejected as an invalid file format." />
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Border.ToolTip>
+                                    </Border>
+                                </StackPanel>
                                 <TextBox Text="{Binding ImportText, UpdateSourceTrigger=PropertyChanged}"
-                                         ToolTip="GitHub repo link, .zip link, or a local .zip / .json / folder path" />
+                                         ToolTip="GitHub repo link, .zip link, or a local .zip / .json / .css / folder path" />
                                 <TextBlock Style="{StaticResource Hint}" Margin="0,4,0,8"
                                            Text="Paste a GitHub link or a .zip link, or browse a local file." />
                                 <UniformGrid Columns="3">
@@ -307,6 +331,19 @@
                                 <DockPanel Margin="0,16,0,6">
                                     <Button DockPanel.Dock="Right" Content="↻" Command="{Binding RefreshCommand}" Padding="8,2" Margin="0"
                                             ToolTip="Refresh Windhawk status and library" />
+                                    <Button DockPanel.Dock="Right" Content="Reset" Command="{Binding ResetToOriginalCommand}" Padding="8,2" Margin="0,0,6,0"
+                                            ToolTipService.ShowOnDisabled="True">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <TextBlock>
+                                                    <Run FontWeight="SemiBold" Text="Reset to original" /><LineBreak />
+                                                    <Run Text="Go back to how Windows looked before any library theme was applied" /><LineBreak />
+                                                    <Run Text="(taskbar, Start menu, Terminal, Discord, wallpaper)." /><LineBreak />
+                                                    <Run Text="Available after you apply a theme." Foreground="{DynamicResource SubtleTextBrush}" />
+                                                </TextBlock>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                    </Button>
                                     <TextBlock Text="Library" Style="{StaticResource SectionTitle}" Margin="0" VerticalAlignment="Center" />
                                 </DockPanel>
                             </StackPanel>
@@ -376,7 +413,9 @@
 
                             <!-- 버튼 + 상태 메시지 -->
                             <StackPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
-                                <TextBlock Text="{Binding Status}" Style="{StaticResource Hint}" Margin="0,0,0,8" MaxHeight="64" />
+                                <ScrollViewer MaxHeight="72" Margin="0,0,0,8" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                    <TextBlock Text="{Binding Status}" Style="{StaticResource Hint}" TextWrapping="Wrap" />
+                                </ScrollViewer>
                                 <UniformGrid Columns="4">
                                     <UniformGrid.Resources>
                                         <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
@@ -395,7 +434,7 @@
 
                             <Grid>
                                 <TextBlock VerticalAlignment="Center" TextAlignment="Center"
-                                           Text="Import a theme or pick one from the library.&#x0a;Themes made for Windhawk's Taskbar / Start menu stylers&#x0a;(like the Gruvbox Material pack) are supported.">
+                                           Text="Import a theme or pick one from the library.&#x0a;Supported: Windhawk taskbar / Start menu styles,&#x0a;Windows Terminal color schemes and Discord themes&#x0a;(like the Gruvbox Material pack).">
                                     <TextBlock.Style>
                                         <Style TargetType="TextBlock" BasedOn="{StaticResource Hint}">
                                             <Setter Property="Visibility" Value="Collapsed" />
@@ -417,7 +456,17 @@
                                                    TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" Margin="0,2,0,10"
                                                    ToolTip="{Binding SelectedTheme.Package.Source}" />
 
-                                        <TextBlock Text="Parts" Style="{StaticResource Hint}" Margin="0,0,0,2" />
+                                        <TextBlock Text="Taskbar &amp; Start (Windhawk)" Margin="0,0,0,2">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock" BasedOn="{StaticResource Hint}">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding ModRows.Count}" Value="0">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
                                         <ItemsControl ItemsSource="{Binding ModRows}">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate DataType="{x:Type vm:ThemeModRow}">
@@ -437,6 +486,39 @@
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
                                         </ItemsControl>
+
+                                        <!-- 앱 테마 (Windows Terminal / Discord) -->
+                                        <StackPanel Margin="0,10,0,0">
+                                            <StackPanel.Style>
+                                                <Style TargetType="StackPanel">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding AppRows.Count}" Value="0">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </StackPanel.Style>
+                                            <TextBlock Text="Apps" Style="{StaticResource Hint}" Margin="0,0,0,2" />
+                                            <ItemsControl ItemsSource="{Binding AppRows}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate DataType="{x:Type vm:ThemeAppRow}">
+                                                        <DockPanel Margin="0,3" ToolTip="{Binding ToolTip}">
+                                                            <Button DockPanel.Dock="Right" Content="{Binding GetLinkText}" Style="{StaticResource LinkButton}"
+                                                                    Command="{Binding DataContext.GetAppCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                                    CommandParameter="{Binding}" VerticalAlignment="Center"
+                                                                    Visibility="{Binding IsAvailable, Converter={StaticResource InverseBoolToVisibility}}" />
+                                                            <CheckBox IsChecked="{Binding IsSelected}" IsEnabled="{Binding IsAvailable}" Margin="0">
+                                                                <StackPanel Orientation="Horizontal">
+                                                                    <TextBlock Text="{Binding Name}" />
+                                                                    <TextBlock Text="{Binding StateText}" Foreground="{DynamicResource SubtleTextBrush}" FontSize="11"
+                                                                               Margin="8,1,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                                </StackPanel>
+                                                            </CheckBox>
+                                                        </DockPanel>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
 
                                         <!-- 임의 스크립트 경고 -->
                                         <Border Margin="0,8,0,0" Padding="10,8" CornerRadius="6" BorderThickness="1"

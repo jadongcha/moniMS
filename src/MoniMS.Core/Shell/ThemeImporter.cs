@@ -43,6 +43,8 @@ public sealed class ThemeImporter
                     break;
                 case ThemeSourceKind.LocalZip:
                     progress?.Report("Extracting...");
+                    if (!IsZip(source.Location))
+                        throw new InvalidThemeFormatException($"'{Path.GetFileName(source.Location)}' is not a valid .zip file.");
                     SafeExtract(source.Location, files);
                     break;
                 case ThemeSourceKind.LocalJson:
@@ -59,8 +61,9 @@ public sealed class ThemeImporter
 
             progress?.Report("Analyzing...");
             ThemeScanner.Scan(package);
-            if (package.Mods.Count == 0 && package.Wallpapers.Count == 0)
-                throw new InvalidDataException("No Windhawk taskbar/start menu settings or wallpapers were found in this package.");
+            if (package.Mods.Count == 0 && package.Apps.Count == 0 && package.Wallpapers.Count == 0)
+                throw new InvalidThemeFormatException(
+                    "No theme files were found in it (Windhawk style settings, Windows Terminal or Discord themes, wallpapers).");
 
             ThemeLibrary.Save(package);
             return package;

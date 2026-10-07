@@ -7,7 +7,7 @@
 - **프리셋**: 배경화면(모니터별), 테마색, 바탕화면 아이콘 배치, 정보 위젯 레이아웃을 한 번에 저장하고 전환합니다.
 - **정보 위젯**: 바탕화면에 붙어 있는 시스템 정보 위젯입니다. CPU·메모리·GPU 사용량과 그래프, 디스크, IP·네트워크 속도, Windows 버전, 하드웨어 정보를 보여 줍니다.
 - UI는 영어, 글꼴은 **JetBrains Mono**를 앱에 내장했습니다 (SIL OFL 1.1). 위젯 글꼴은 설정에서 바꿀 수 있고, 프리셋에도 함께 저장됩니다.
-- **작업표시줄·시작 메뉴 테마**: 인터넷의 Windhawk 테마 패키지(GitHub 링크, .zip, 폴더)를 가져와 적용합니다. 적용 전 설정은 자동으로 백업되고 되돌릴 수 있습니다. ([Windhawk](https://windhawk.net) 필요)
+- **테마**: 인터넷의 테마 패키지(GitHub 링크, .zip, 폴더, .json, .css)를 가져와 작업표시줄·시작 메뉴(Windhawk), Windows Terminal, Discord(Vencord/BetterDiscord 등)에 적용합니다. 적용 전 상태는 자동으로 백업되고 되돌릴 수 있습니다.
 
 ## 실행 방법
 
@@ -40,7 +40,8 @@ MoniMS.sln
 │  ├─ Presets/                프리셋 모델, JSON 저장소, PresetService (캡처/적용)
 │  ├─ Desktop/                배경화면(COM), 테마(레지스트리), 아이콘 배치(ListView), 색상 유틸
 │  ├─ Settings/               앱 설정, 자동 실행 등록
-│  ├─ Shell/                  작업표시줄·시작 메뉴 테마: Windhawk 저장소, 테마 가져오기/분석/적용/백업
+│  ├─ Shell/                  테마: Windhawk 저장소, 테마 가져오기/분석/적용/백업
+│  │  └─ Apps/                Windows Terminal·Discord 테마 적용 (FileJournal로 원래 파일 내용 기록)
 │  └─ Interop/                Win32 P/Invoke, COM 인터페이스
 ├─ src/MoniMS.App             WPF 앱 (MVVM: CommunityToolkit.Mvvm, DI: Microsoft.Extensions.DependencyInjection)
 │  ├─ Program.cs              시작점: Velopack 처리 → WPF 앱 실행
@@ -69,8 +70,8 @@ MoniMS.sln
 | `settings.json` | 현재 위젯 레이아웃, 마지막 적용 프리셋 |
 | `presets\{id}\preset.json` | 프리셋 내용 (사람이 읽을 수 있는 JSON) |
 | `presets\{id}\wallpaper_*.jpg` | 배경화면 복사본 (원본이 지워져도 프리셋 유지) |
-| `themes\{id}\` | 가져온 작업표시줄·시작 메뉴 테마 (`theme.json` + `files\`) |
-| `themes\_backups\*.json` | 테마 적용 전 Windhawk 설정 백업 |
+| `themes\{id}\` | 가져온 테마 (`theme.json` + `files\`) |
+| `themes\_backups\*.json` | 테마 적용 전 백업 (Windhawk 설정 + Terminal·Discord 파일 원래 내용) |
 | `logs\moniMS.log` | 로그 |
 
 설치 프로그램으로 설치하면 앱 자체는 `%LocalAppData%\MoniMS\`에 들어가고, 위 데이터 폴더는 제거해도 남습니다.
@@ -95,6 +96,8 @@ MoniMS.sln
 
 ## 작업표시줄·시작 메뉴 테마 (Windhawk 연동)
 
+설정 창의 **Themes** 탭입니다.
+
 Windows 11의 작업표시줄과 시작 메뉴는 공식적으로 바꿀 방법이 없습니다. 그래서 대부분의 테마는 [Windhawk](https://windhawk.net)의 스타일러 모드 설정(JSON) 형태로 배포됩니다. MoniMS는 이 설정을 가져와 Windhawk에 직접 써 넣습니다. explorer에 코드를 주입하는 일은 Windhawk가 합니다.
 
 | 패키지 안의 파일 | 적용 대상 Windhawk 모드 |
@@ -111,8 +114,23 @@ Windows 11의 작업표시줄과 시작 메뉴는 공식적으로 바꿀 방법�
 - **즉시 반영:** 쓰고 나서 `SettingsChangeTime`을 갱신하면 Windhawk가 바로 반영합니다.
 - **관리자 권한:** HKLM에 쓸 권한이 없으면 `MoniMS.exe --windhawk-write`를 관리자 권한으로 한 번 실행합니다(UAC). 이 헬퍼는 위 4개 모드 ID 외의 쓰기 요청은 거부합니다.
 - **백업과 복원:** 적용 전 현재 설정을 `%APPDATA%\MoniMS\themes\_backups`에 저장합니다. Restore를 누르면 가장 최근 백업으로 되돌립니다.
+- **Reset (원래대로):** 모든 백업을 오래된 순으로 읽어 항목(모드·파일)마다 가장 오래된 값, 즉 테마를 처음 적용하기 전 값으로 되돌리고 백업을 모두 지웁니다. 테마 배경화면을 처음 적용할 때 지금 배경화면을 `_backups\original-wallpaper`에 저장해 두었다가 함께 되돌립니다.
 - **임의 스크립트:** 시작 메뉴의 `webContentCustomJs` 같은 스크립트 설정은 기본적으로 빼고 적용하며, 사용자가 허용할 때만 넣습니다.
-- **다른 앱 설정:** Terminal, Discord 등 다른 앱용 설정은 "적용 안 됨"으로 표시만 합니다.
+- **다른 앱 설정:** Spicetify, Komorebi 등 지원하지 않는 앱용 폴더는 "적용 안 됨"으로 표시만 합니다.
+
+## Windows Terminal · Discord 테마
+
+Windhawk 설정이 아닌 파일도 분석합니다 (`Shell/Apps/`). 적용할 때 바꾸는 파일의 원래 내용을 `FileJournal`에 기록해 두고, Windhawk 백업과 같은 백업 파일(`files` 항목)에 함께 저장합니다. Restore를 누르면 원래 내용으로 되돌리고, 원래 없던 파일은 지웁니다.
+
+| 패키지 안의 파일 | 적용 방법 |
+|---|---|
+| `schemes`가 있는 JSON (Terminal `settings.json`) 또는 색 구성표 하나짜리 JSON | `%LOCALAPPDATA%\Packages\Microsoft.WindowsTerminal*_8wekyb3d8bbwe\LocalState\settings.json`(스토어/Preview)과 비패키지 설치의 `settings.json`에 **합치기** |
+| `*.theme.css`, `Discord` 폴더 안의 `.css` | `%APPDATA%\{Vencord, vesktop, Equicord, equibop}\themes`에 복사 + `settings\settings.json`의 `enabledThemes`에 추가, `%APPDATA%\BetterDiscord\themes`에 복사 + `data\{채널}\themes.json`에 `{ "@name": true }` |
+
+- **Terminal 합치기 규칙:** 패키지 settings.json을 통째로 덮어쓰지 않습니다. `schemes`·`themes`는 이름이 같으면 교체하고 없으면 추가합니다. `profiles.defaults`에서는 모양 관련 키만 가져옵니다(colorScheme, font, opacity, useAcrylic, padding, cursorShape …). 단축키, 기본 프로필, 프로필 목록은 그대로 둡니다. 예전 배열 형식의 `profiles`는 `{ defaults, list }`로 바꿉니다. 주석이 있는 JSONC도 읽지만, 다시 쓸 때 주석은 사라집니다(복원하면 원래 파일 그대로 돌아옵니다).
+- **글꼴:** `font.face`가 설치돼 있지 않으면(HKLM/HKCU `...\CurrentVersion\Fonts`) 글꼴만 빼고 적용하고 경고를 띄웁니다. Discord 테마의 `--font` 변수도 확인합니다.
+- **Discord:** 순정 Discord는 테마를 불러올 수 없어서, 이미 설치된 클라이언트 모드가 있을 때만 적용합니다. MoniMS는 클라이언트 모드를 설치하지 않습니다(Discord 이용약관 위반 소지). Discord가 실행 중이면 재시작하라고 알립니다.
+- **예전 매니페스트:** `theme.json`의 `schemaVersion`이 2보다 낮으면 불러올 때 다시 분석해 `apps`를 채웁니다.
 
 ## 릴리스 방법
 
@@ -176,7 +194,7 @@ vpk pack --packId MoniMS --packVersion 0.0.1 --packDir publish --mainExe MoniMS.
 ## 로드맵
 
 1. ✅ 정보 위젯, 프리셋 (배경화면 / 테마색 / 아이콘 / 위젯)
-2. ✅ 작업표시줄·시작 메뉴 테마 (Windhawk 연동)
+2. ✅ 작업표시줄·시작 메뉴 테마 (Windhawk 연동), Windows Terminal·Discord 테마
 3. ⬜ 작업표시줄 꾸미기 (Windhawk 없이): 투명·블러·아크릴 (`SetWindowCompositionAttribute`), 정렬, 자동 숨김 → 프리셋에 `Taskbar` 항목 추가
 4. ⬜ 커스텀 시작 메뉴: Win 키를 가로채(저수준 키보드 훅) 직접 디자인한 런처를 띄움 (앱 목록, 고정, 검색)
 5. ⬜ 위젯 확장: 온도 센서, 여러 위젯, 위젯별 프리셋

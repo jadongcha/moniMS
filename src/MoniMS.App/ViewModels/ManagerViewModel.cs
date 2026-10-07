@@ -109,7 +109,7 @@ public sealed partial class ManagerViewModel : ObservableObject
         _loadingWidget = false;
     }
 
-    /// <summary>"Taskbar &amp; Start" 탭.</summary>
+    /// <summary>"Themes" 탭.</summary>
     public ShellThemesViewModel Shell { get; }
 
     // ================= 프리셋 =================

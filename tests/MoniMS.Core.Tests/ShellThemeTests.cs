@@ -3,6 +3,7 @@ using System.Text;
 using MoniMS.Core.Desktop;
 using MoniMS.Core.Presets;
 using MoniMS.Core.Shell;
+using MoniMS.Core.Shell.Apps;
 
 namespace MoniMS.Core.Tests;
 
@@ -95,7 +96,9 @@ public sealed class ShellThemeTests : IDisposable
         Add("Win11Sample-main/Windhawk/Taskbar.json", """{ "controlStyles[0].target": "Taskbar.TaskbarFrame", "controlStyles[0].styles[0]": "Fill:=#32302F", "theme": "" }""");
         Add("Win11Sample-main/Windhawk/StartMenu.json", """{ "theme": "", "disableNewStartMenuLayout": 0, "webContentCustomJs": "" }""");
         Add("Win11Sample-main/Windhawk/ResourceRedirect.json", """{ "iconTheme": "", "allResourceRedirect": 0 }""");
-        Add("Win11Sample-main/Terminal/settings.json", """{ "profiles": { "list": [] } }""");
+        Add("Win11Sample-main/Terminal/settings.json", AppThemeTests.TerminalSource);
+        Add("Win11Sample-main/Discord/sample.theme.css", "/**\n * @name Sample Theme\n */\nbody { --font: 'DM Mono'; }");
+        Add("Win11Sample-main/Spicetify/color.ini", "[x]");
         Add("Win11Sample-main/Wallpapers/a.png", "png");
         Add("Win11Sample-main/Wallpapers/b.jpg", "jpg");
         return zipPath;
@@ -115,8 +118,10 @@ public sealed class ShellThemeTests : IDisposable
             new[] { WindhawkMods.ResourceRedirect, WindhawkMods.StartMenuStyler, WindhawkMods.TaskbarStyler }.Order(),
             p.Mods.Select(m => m.ModId).Order());
         Assert.Equal(2, p.Wallpapers.Count);
-        Assert.Contains("Terminal", p.OtherItems);
-        Assert.DoesNotContain("Windhawk", p.OtherItems);
+        Assert.Equal(new[] { AppThemeKind.WindowsTerminal, AppThemeKind.Discord }.Order(), p.Apps.Select(a => a.Kind).Order());
+        Assert.Contains("Gruvbox Material", p.Apps.Single(a => a.Kind == AppThemeKind.WindowsTerminal).Summary);
+        Assert.Equal("theme 'Sample Theme'", p.Apps.Single(a => a.Kind == AppThemeKind.Discord).Summary);
+        Assert.Equal(["Spicetify"], p.OtherItems);
 
         // 보관함에서 다시 읽힘
         var again = Assert.Single(library.GetAll());
@@ -142,13 +147,13 @@ public sealed class ShellThemeTests : IDisposable
         var dir = Path.Combine(_root, "empty");
         Directory.CreateDirectory(dir);
         File.WriteAllText(Path.Combine(dir, "readme.txt"), "hi");
-        await Assert.ThrowsAsync<InvalidDataException>(() => new ThemeImporter(library).ImportAsync(dir));
+        await Assert.ThrowsAsync<InvalidThemeFormatException>(() => new ThemeImporter(library).ImportAsync(dir));
         Assert.Empty(Directory.GetDirectories(library.RootDirectory));
     }
 
     // ---------- 적용 / 백업 / 복원 ----------
 
-    private sealed class FakeStorage : IWindhawkStorage
+    internal sealed class FakeStorage : IWindhawkStorage
     {
         public Dictionary<string, Dictionary<string, object>> Mods { get; } = new()
         {
@@ -163,7 +168,7 @@ public sealed class ShellThemeTests : IDisposable
         public void WriteSettings(string modId, IReadOnlyDictionary<string, object> settings) => Mods[modId] = new(settings);
     }
 
-    private sealed class DirectWriter(IWindhawkStorage s) : IWindhawkSettingsWriter
+    internal sealed class DirectWriter(IWindhawkStorage s) : IWindhawkSettingsWriter
     {
         public void Write(IReadOnlyList<ModSettingsWrite> items)
         {
@@ -172,7 +177,7 @@ public sealed class ShellThemeTests : IDisposable
         }
     }
 
-    private sealed class NoWallpaper : IWallpaperService
+    internal sealed class NoWallpaper : IWallpaperService
     {
         public WallpaperSettings Capture(string d) => new();
         public void Apply(WallpaperSettings s, string d) { }
@@ -187,7 +192,7 @@ public sealed class ShellThemeTests : IDisposable
         var storage = new FakeStorage();
         var applier = new ThemeApplier(storage, new DirectWriter(storage), new NoWallpaper(), library);
 
-        var result = applier.ApplyMods(p, new ThemeApplyOptions(p.Mods.Select(m => m.ModId).ToList(), false, null));
+        var result = applier.Apply(p, new ThemeApplyOptions(p.Mods.Select(m => m.ModId).ToList(), false, null));
 
         Assert.Equal(new[] { WindhawkMods.StartMenuStyler, WindhawkMods.TaskbarStyler }.Order(), result.AppliedMods.Order());
         Assert.Contains(result.Warnings, w => w.Contains("not installed")); // Resource Redirect 미설치
@@ -214,6 +219,36 @@ public sealed class ShellThemeTests : IDisposable
         Assert.Equal(3, w.Settings["b"]);
 
         Assert.Throws<InvalidDataException>(() => ThemeApplier.DeserializeWrites("""{ "..\\..\\evil": {} }"""));
+    }
+
+    [Theory]
+    [InlineData(null, false)]
+    [InlineData("1.6.1", false)]
+    [InlineData("1.7", false)]
+    [InlineData("2.0.0-alpha.6", true)]
+    [InlineData("v2.1", true)]
+    public void Deep_links_only_for_windhawk_2(string? version, bool expected) =>
+        Assert.Equal(expected, WindhawkMods.SupportsDeepLinks(version));
+
+    [Fact]
+    public async Task Wrong_files_are_rejected_as_invalid_format()
+    {
+        var library = new ThemeLibrary(Path.Combine(_root, "lib"));
+        var importer = new ThemeImporter(library);
+
+        var png = Path.Combine(_root, "photo.png");
+        File.WriteAllText(png, "x");
+        await Assert.ThrowsAsync<InvalidThemeFormatException>(() => importer.ImportAsync(png));
+
+        var fakeZip = Path.Combine(_root, "notreally.zip");
+        File.WriteAllText(fakeZip, "hello");
+        await Assert.ThrowsAsync<InvalidThemeFormatException>(() => importer.ImportAsync(fakeZip));
+
+        var otherJson = Path.Combine(_root, "package.json");
+        File.WriteAllText(otherJson, """{ "name": "x", "dependencies": { "a": "1" } }""");
+        await Assert.ThrowsAsync<InvalidThemeFormatException>(() => importer.ImportAsync(otherJson));
+
+        Assert.Empty(Directory.GetDirectories(library.RootDirectory)); // 반쯤 만든 폴더 없음
     }
 
     // ---------- windhawk.ini ----------
@@ -243,7 +278,13 @@ public sealed class ShellThemeTests : IDisposable
         Console.WriteLine($"name={p.Name} desc={p.Description}");
         foreach (var m in p.Mods)
             Console.WriteLine($"  mod {m.ModId} <- {m.SourceFile} ({m.SettingCount} settings, script={m.HasCustomScript})");
+        foreach (var a in p.Apps)
+            Console.WriteLine($"  app {a.Kind} <- {a.SourceFile} ({a.Summary})");
         Console.WriteLine($"  wallpapers={p.Wallpapers.Count} other=[{string.Join(", ", p.OtherItems)}]");
         Assert.Equal(4, p.Mods.Count);
+        Assert.Contains(p.Apps, a => a.Kind == AppThemeKind.WindowsTerminal && a.Summary.Contains("Gruvbox Material"));
+        Assert.Contains(p.Apps, a => a.Kind == AppThemeKind.Discord);
+        Assert.DoesNotContain("Terminal", p.OtherItems);
+        Assert.DoesNotContain("Discord", p.OtherItems);
     }
 }

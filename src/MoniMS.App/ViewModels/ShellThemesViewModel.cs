@@ -9,6 +9,7 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using MoniMS.Core.Settings;
 using MoniMS.Core.Shell;
+using MoniMS.Core.Shell.Apps;
 
 namespace MoniMS.App.ViewModels;
 
@@ -22,6 +23,7 @@ public sealed class ThemeListItem(ThemePackage package)
         get
         {
             var parts = Package.Mods.Select(m => WindhawkMods.DisplayName(m.ModId).Split(' ')[0]).ToList();
+            parts.AddRange(Package.Apps.Select(a => a.Kind == AppThemeKind.WindowsTerminal ? "Terminal" : ThemeAppConfig.DisplayName(a.Kind)));
             if (Package.Wallpapers.Count > 0)
                 parts.Add($"{Package.Wallpapers.Count} wallpapers");
             return string.Join(" · ", parts);
@@ -48,6 +50,56 @@ public sealed partial class ThemeModRow(ThemeModConfig config, ModState state) :
     [ObservableProperty] private bool _isSelected = state != ModState.NotInstalled;
 }
 
+/// <summary>앱 테마 한 줄 (Windows Terminal / Discord).</summary>
+public sealed partial class ThemeAppRow : ObservableObject
+{
+    public ThemeAppRow(ThemeAppConfig config, AppThemeTargets targets)
+    {
+        Config = config;
+        switch (config.Kind)
+        {
+            case AppThemeKind.WindowsTerminal:
+                var files = WindowsTerminalThemer.FindSettingsFiles(targets.LocalAppData);
+                IsAvailable = files.Count > 0;
+                StateText = IsAvailable ? config.Summary : "Windows Terminal not found";
+                GetLinkText = "Get Terminal ↗";
+                GetLink = "ms-windows-store://pdp/?productid=9N0DX20HK701";
+                ToolTip = "Adds the theme's color schemes and appearance (font, opacity, padding) to your Terminal settings.\n"
+                          + "Your profiles, key bindings and other settings are kept.";
+                break;
+            case AppThemeKind.Discord:
+                var clients = DiscordThemer.FindClients(targets.AppData);
+                IsAvailable = clients.Count > 0;
+                StateText = IsAvailable
+                    ? $"{config.Summary} · {string.Join(", ", clients.Select(c => c.Name))}"
+                    : "needs Vencord or BetterDiscord";
+                GetLinkText = "Get Vencord ↗";
+                GetLink = "https://vencord.dev/download/";
+                ToolTip = "Plain Discord cannot load themes. MoniMS puts the theme into a client mod you already use\n"
+                          + "(Vencord, Vesktop, Equicord or BetterDiscord) and turns it on.\n"
+                          + "Client mods are not allowed by Discord's Terms of Service. Use them at your own risk.";
+                break;
+            default:
+                StateText = config.Summary;
+                GetLinkText = "";
+                GetLink = "";
+                ToolTip = "";
+                break;
+        }
+        _isSelected = IsAvailable;
+    }
+
+    public ThemeAppConfig Config { get; }
+    public string Name => ThemeAppConfig.DisplayName(Config.Kind);
+    public bool IsAvailable { get; }
+    public string StateText { get; }
+    public string GetLinkText { get; }
+    public string GetLink { get; }
+    public string ToolTip { get; }
+
+    [ObservableProperty] private bool _isSelected;
+}
+
 public sealed class WallpaperThumb(string relativePath, ImageSource? thumbnail)
 {
     public string RelativePath { get; } = relativePath;
@@ -55,7 +107,7 @@ public sealed class WallpaperThumb(string relativePath, ImageSource? thumbnail)
     public ImageSource? Thumbnail { get; } = thumbnail;
 }
 
-/// <summary>설정 창 "Taskbar &amp; Start" 탭: 테마 가져오기 / 보관함 / 적용 / 되돌리기.</summary>
+/// <summary>설정 창 "Themes" 탭: 테마 가져오기 / 보관함 / 적용(Windhawk·Terminal·Discord) / 되돌리기.</summary>
 public sealed partial class ShellThemesViewModel : ObservableObject, IDisposable
 {
     private readonly ThemeLibrary _library;
@@ -88,7 +140,7 @@ public sealed partial class ShellThemesViewModel : ObservableObject, IDisposable
     private string _importText = "";
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(ImportCommand), nameof(ApplyCommand), nameof(RestoreCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ImportCommand), nameof(ApplyCommand), nameof(RestoreCommand), nameof(ResetToOriginalCommand))]
     private bool _isBusy;
 
     [ObservableProperty] private string _status = "";
@@ -104,6 +156,7 @@ public sealed partial class ShellThemesViewModel : ObservableObject, IDisposable
     public bool HasSelection => SelectedTheme is not null;
 
     public ObservableCollection<ThemeModRow> ModRows { get; } = [];
+    public ObservableCollection<ThemeAppRow> AppRows { get; } = [];
     public ObservableCollection<WallpaperThumb> Wallpapers { get; } = [];
 
     [ObservableProperty] private WallpaperThumb? _selectedWallpaper;
@@ -116,6 +169,17 @@ public sealed partial class ShellThemesViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(RestoreCommand))]
     private string? _backupLabel;
+
+    /// <summary>테마 적용 전 원래 상태로 되돌릴 것이 있는지.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ResetToOriginalCommand))]
+    private bool _hasOriginal;
+
+    private void UpdateBackupState()
+    {
+        BackupLabel = _applier.LatestBackupLabel;
+        HasOriginal = _applier.HasOriginal;
+    }
 
     partial void OnSelectedThemeChanged(ThemeListItem? value) => LoadDetails(value?.Package);
 
@@ -140,12 +204,13 @@ public sealed partial class ShellThemesViewModel : ObservableObject, IDisposable
         foreach (var p in _library.GetAll())
             Themes.Add(new ThemeListItem(p));
         SelectedTheme = Themes.FirstOrDefault(t => t.Package.Id == selectedId) ?? Themes.FirstOrDefault();
-        BackupLabel = _applier.LatestBackupLabel;
+        UpdateBackupState();
     }
 
     private void LoadDetails(ThemePackage? package)
     {
         ModRows.Clear();
+        AppRows.Clear();
         Wallpapers.Clear();
         SelectedWallpaper = null;
         ApplyWallpaper = false;
@@ -160,6 +225,8 @@ public sealed partial class ShellThemesViewModel : ObservableObject, IDisposable
 
         foreach (var mod in package.Mods.OrderBy(m => WindhawkMods.All.ToList().IndexOf(m.ModId)))
             ModRows.Add(new ThemeModRow(mod, _storage.GetModState(mod.ModId)));
+        foreach (var app in package.Apps.OrderBy(a => a.Kind))
+            AppRows.Add(new ThemeAppRow(app, _applier.Targets));
         HasCustomScript = package.Mods.Any(m => m.HasCustomScript);
         OtherItemsText = package.OtherItems.Count == 0 ? null : string.Join(", ", package.OtherItems);
 
@@ -217,7 +284,14 @@ public sealed partial class ShellThemesViewModel : ObservableObject, IDisposable
             ImportText = "";
             Refresh();
             SelectedTheme = Themes.FirstOrDefault(t => t.Package.Id == package.Id);
-            Status = $"Imported '{package.Name}': {package.Mods.Count} part(s), {package.Wallpapers.Count} wallpaper(s).";
+            Status = $"Imported '{package.Name}': {package.Mods.Count + package.Apps.Count} part(s), {package.Wallpapers.Count} wallpaper(s).";
+        }
+        catch (InvalidThemeFormatException ex)
+        {
+            _logger.LogInformation("Rejected theme import: {Reason}", ex.Message);
+            Status = "Invalid file format.";
+            MessageBox.Show("Invalid file format.\n\n" + ex.Message + "\n\nHover the ⓘ next to \"Import a theme\" to see what can be imported.",
+                "MoniMS", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         catch (Exception ex)
         {
@@ -236,7 +310,7 @@ public sealed partial class ShellThemesViewModel : ObservableObject, IDisposable
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
             Title = "Choose a theme package",
-            Filter = "Theme package (*.zip;*.json)|*.zip;*.json|All files (*.*)|*.*",
+            Filter = "Theme package (*.zip;*.json;*.css)|*.zip;*.json;*.css|All files (*.*)|*.*",
         };
         if (dialog.ShowDialog() == true)
         {
@@ -269,8 +343,9 @@ public sealed partial class ShellThemesViewModel : ObservableObject, IDisposable
     {
         var package = SelectedTheme!.Package;
         var modIds = ModRows.Where(r => r.IsSelected && r.IsInstalled).Select(r => r.Config.ModId).ToList();
+        var apps = AppRows.Where(r => r.IsSelected && r.IsAvailable).Select(r => r.Config.Kind).ToList();
         var wallpaper = ApplyWallpaper ? SelectedWallpaper?.RelativePath ?? package.Wallpapers.FirstOrDefault() : null;
-        if (modIds.Count == 0 && wallpaper is null)
+        if (modIds.Count == 0 && apps.Count == 0 && wallpaper is null)
         {
             Status = "Nothing selected to apply.";
             return;
@@ -280,15 +355,15 @@ public sealed partial class ShellThemesViewModel : ObservableObject, IDisposable
         Status = "Applying...";
         try
         {
-            var options = new ThemeApplyOptions(modIds, AllowCustomScript, wallpaper);
+            var options = new ThemeApplyOptions(modIds, AllowCustomScript, wallpaper, apps);
             // 관리자 권한 헬퍼를 기다릴 수 있으므로 UI 스레드 밖에서
-            var result = modIds.Count > 0
-                ? await Task.Run(() => _applier.ApplyMods(package, options))
+            var result = modIds.Count > 0 || apps.Count > 0
+                ? await Task.Run(() => _applier.Apply(package, options))
                 : new ThemeApplyResult([], false, []);
 
             var wallpaperSet = wallpaper is not null && _applier.ApplyWallpaper(package, wallpaper);
 
-            var parts = result.AppliedMods.Select(WindhawkMods.DisplayName).ToList();
+            var parts = result.AppliedMods.Select(WindhawkMods.DisplayName).Concat(result.Apps).ToList();
             if (wallpaperSet)
                 parts.Add("wallpaper");
             Status = (parts.Count > 0 ? $"Applied: {string.Join(", ", parts)}. Changes appear in a few seconds." : "Nothing was applied.")
@@ -306,8 +381,47 @@ public sealed partial class ShellThemesViewModel : ObservableObject, IDisposable
         finally
         {
             IsBusy = false;
-            BackupLabel = _applier.LatestBackupLabel;
+            UpdateBackupState();
             LoadDetails(package); // 모드 상태 갱신
+        }
+    }
+
+    private bool CanResetToOriginal() => !IsBusy && HasOriginal;
+
+    /// <summary>라이브러리 테마를 적용하기 전(처음) 상태로 한 번에 되돌린다.</summary>
+    [RelayCommand(CanExecute = nameof(CanResetToOriginal))]
+    private async Task ResetToOriginalAsync()
+    {
+        if (MessageBox.Show(
+                "Go back to how Windows looked before you applied any theme from the library?\n\n"
+                + "This undoes every theme apply at once: taskbar & Start menu (Windhawk), Windows Terminal, Discord and wallpaper.",
+                "MoniMS", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            return;
+        IsBusy = true;
+        Status = "Resetting...";
+        try
+        {
+            var restored = (await Task.Run(_applier.ResetToOriginal)).ToList();
+            if (_applier.RestoreOriginalWallpaper())
+                restored.Add("wallpaper");
+            Status = restored.Count > 0
+                ? $"Back to your original look: {string.Join(", ", restored)}."
+                : "Nothing needed resetting.";
+        }
+        catch (OperationCanceledException ex)
+        {
+            Status = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Theme reset failed");
+            Status = "Reset failed: " + ex.Message;
+        }
+        finally
+        {
+            IsBusy = false;
+            UpdateBackupState();
+            LoadDetails(SelectedTheme?.Package);
         }
     }
 
@@ -316,14 +430,14 @@ public sealed partial class ShellThemesViewModel : ObservableObject, IDisposable
     [RelayCommand(CanExecute = nameof(CanRestore))]
     private async Task RestoreAsync()
     {
-        if (MessageBox.Show($"Restore the Windhawk settings saved {BackupLabel}?", "MoniMS",
+        if (MessageBox.Show($"Restore the settings saved {BackupLabel}?\n(Windhawk mods, Windows Terminal and Discord theme files)", "MoniMS",
                 MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
             return;
         IsBusy = true;
         try
         {
-            var mods = await Task.Run(_applier.RestoreLatest);
-            Status = $"Restored: {string.Join(", ", mods.Select(WindhawkMods.DisplayName))}.";
+            var restored = await Task.Run(_applier.RestoreLatest);
+            Status = restored.Count > 0 ? $"Restored: {string.Join(", ", restored)}." : "Nothing needed restoring.";
         }
         catch (OperationCanceledException ex)
         {
@@ -337,7 +451,7 @@ public sealed partial class ShellThemesViewModel : ObservableObject, IDisposable
         finally
         {
             IsBusy = false;
-            BackupLabel = _applier.LatestBackupLabel;
+            UpdateBackupState();
         }
     }
 
@@ -347,7 +461,7 @@ public sealed partial class ShellThemesViewModel : ObservableObject, IDisposable
     private void DeleteTheme()
     {
         var p = SelectedTheme!.Package;
-        if (MessageBox.Show($"Remove '{p.Name}' from the library?\nWindhawk settings already applied stay as they are.", "MoniMS",
+        if (MessageBox.Show($"Remove '{p.Name}' from the library?\nSettings already applied stay as they are.", "MoniMS",
                 MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
             return;
         try
@@ -377,10 +491,26 @@ public sealed partial class ShellThemesViewModel : ObservableObject, IDisposable
     {
         if (row is null)
             return;
-        // 최신 Windhawk는 windhawk:// 링크로 모드 페이지를 연다. 안 되면 웹 페이지.
-        if (!OpenUrl(WindhawkMods.InstallLink(row.Config.ModId)))
-            OpenUrl(WindhawkMods.WebLink(row.Config.ModId));
-        Status = $"Install '{row.Name}' in Windhawk, then press ↻ to refresh.";
+        var name = WindhawkMods.StoreName(row.Config.ModId);
+        // windhawk:// 링크는 Windhawk 2.0부터. 1.x에서는 편집기 창만 열리므로 웹 페이지로 안내.
+        var version = _storage.Detect().Version;
+        if (WindhawkMods.SupportsDeepLinks(version) && OpenUrl(WindhawkMods.InstallLink(row.Config.ModId)))
+        {
+            Status = $"Install '{name}' in Windhawk, then press ↻ to refresh.";
+            return;
+        }
+        OpenUrl(WindhawkMods.WebLink(row.Config.ModId));
+        Status = $"In Windhawk, open Explore, search '{name}' and press Install. Then press ↻ to refresh.";
+    }
+
+    [RelayCommand]
+    private void GetApp(ThemeAppRow? row)
+    {
+        if (row is null || row.GetLink.Length == 0)
+            return;
+        if (!OpenUrl(row.GetLink) && row.Config.Kind == AppThemeKind.WindowsTerminal)
+            OpenUrl("https://aka.ms/terminal");
+        Status = $"Install it, then press ↻ to refresh.";
     }
 
     [RelayCommand]

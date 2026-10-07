@@ -43,11 +43,30 @@ public sealed class ThemeLibrary
             if (p is null)
                 return null;
             p.Directory = directory;
+            if (p.SchemaVersion < ThemePackage.CurrentSchemaVersion && Directory.Exists(p.FilesDirectory))
+            {
+                // 예전 버전에서 가져온 테마: 새로 지원하는 항목(앱 테마 등)을 찾도록 다시 분석
+                ThemeScanner.Scan(p);
+                p.SchemaVersion = ThemePackage.CurrentSchemaVersion;
+                TrySave(p);
+            }
             return p;
         }
-        catch (Exception ex) when (ex is JsonException or IOException)
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {
             return null;
+        }
+    }
+
+    private static void TrySave(ThemePackage package)
+    {
+        try
+        {
+            Save(package);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // 저장 못 해도 이번 실행에서는 분석 결과를 그대로 쓴다
         }
     }
 

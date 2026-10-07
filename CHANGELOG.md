@@ -6,6 +6,25 @@ Write upcoming changes under **[Unreleased]**; `release.ps1` moves them into the
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-08
+
+### Added
+- Themes can now restyle **Windows Terminal** (color schemes, font, opacity, padding; your profiles and key bindings are kept).
+- Themes can now restyle **Discord** through Vencord, Vesktop, Equicord or BetterDiscord.
+- Import a single `.css` Discord theme file.
+- Warnings when a theme's font is not installed.
+- **Reset** button next to the library's refresh button: goes back to how Windows looked before any library theme was applied (taskbar, Start menu, Terminal, Discord and wallpaper) in one click.
+- ⓘ next to "Import a theme": hover to see which files can be imported.
+- Importing a file that is not a theme now shows an **Invalid file format** warning.
+
+### Changed
+- The "Taskbar & Start" tab is now called **Themes**.
+- **Restore** also undoes Terminal and Discord changes.
+- Themes imported with an older version are re-analyzed automatically.
+
+### Fixed
+- **Install mod** opened an empty editor window on Windhawk 1.x. It now opens the mod's page on windhawk.net and tells you what to search for in Windhawk.
+
 ## [0.1.0] - 2026-10-08
 
 First public release.

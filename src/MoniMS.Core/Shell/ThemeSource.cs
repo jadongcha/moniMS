@@ -15,7 +15,7 @@ public sealed record ThemeSource(ThemeSourceKind Kind, string Location, string S
     /// <summary>
     /// 지원 형식:
     /// <list type="bullet">
-    /// <item>로컬 폴더 / .zip / .json</item>
+    /// <item>로컬 폴더 / .zip / .json / .css(Discord 테마)</item>
     /// <item>github.com/{owner}/{repo} → 기본 브랜치 zip</item>
     /// <item>github.com/{owner}/{repo}/tree/{branch}[/{path}] → 해당 브랜치 zip (+하위 폴더)</item>
     /// <item>github.com/{owner}/{repo}/blob/{branch}/{path}.json → raw 파일</item>
@@ -39,8 +39,9 @@ public sealed record ThemeSource(ThemeSourceKind Kind, string Location, string S
             return ext switch
             {
                 ".zip" => new ThemeSource(ThemeSourceKind.LocalZip, s, Path.GetFileNameWithoutExtension(s)),
-                ".json" => new ThemeSource(ThemeSourceKind.LocalJson, s, Path.GetFileNameWithoutExtension(s)),
-                _ => throw new NotSupportedException("Only .zip, .json or folders are supported."),
+                ".json" or ".css" => new ThemeSource(ThemeSourceKind.LocalJson, s,
+                    Path.GetFileNameWithoutExtension(s).Replace(".theme", "", StringComparison.OrdinalIgnoreCase)),
+                _ => throw new InvalidThemeFormatException($"'{Path.GetFileName(s)}' is not a theme file. Use a .zip, .json, .css file or a folder."),
             };
         }
 
@@ -87,3 +88,6 @@ public sealed record ThemeSource(ThemeSourceKind Kind, string Location, string S
         return new ThemeSource(ThemeSourceKind.RemoteFile, uri.ToString(), Path.GetFileNameWithoutExtension(fileName));
     }
 }
+
+/// <summary>가져온 파일이 테마 형식이 아님 (확장자가 다르거나, 안에 쓸 수 있는 테마 파일이 없음).</summary>
+public sealed class InvalidThemeFormatException(string message) : Exception(message);
