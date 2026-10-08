@@ -35,6 +35,10 @@ public sealed class ThemeService : IThemeService
 
     public void Apply(ThemeSettings settings)
     {
+        // 이미 같은 상태면 아무것도 하지 않는다. 변경 알림은 모든 창이 응답할 때까지 기다려서 수백 ms~수 초가 걸린다.
+        if (IsCurrent(Capture(), settings))
+            return;
+
         using (var personalize = Registry.CurrentUser.CreateSubKey(PersonalizeKey))
         {
             WriteBool(personalize, "AppsUseLightTheme", settings.AppsUseLightTheme);
@@ -83,6 +87,28 @@ public sealed class ThemeService : IThemeService
         if (dwm?.GetValue("AccentColor") is int d)
             return Rgb.FromAbgr(unchecked((uint)d));
         return Rgb.Parse("#0078D4");
+    }
+
+    /// <summary>지금 상태(current)에 target을 적용해도 바뀌는 것이 없는지.</summary>
+    internal static bool IsCurrent(ThemeSettings current, ThemeSettings target)
+    {
+        if (current.AppsUseLightTheme != target.AppsUseLightTheme
+            || current.SystemUsesLightTheme != target.SystemUsesLightTheme
+            || current.EnableTransparency != target.EnableTransparency
+            || current.AccentOnStartAndTaskbar != (target.AccentOnStartAndTaskbar && !target.SystemUsesLightTheme)
+            || current.AccentOnTitleBars != target.AccentOnTitleBars
+            || current.AutoAccentFromWallpaper != target.AutoAccentFromWallpaper)
+            return false;
+        if (target.AutoAccentFromWallpaper)
+            return true; // 강조색은 배경화면이 정한다
+        try
+        {
+            return Rgb.Parse(current.AccentColor) == Rgb.Parse(target.AccentColor);
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
     }
 
     private static void Broadcast()

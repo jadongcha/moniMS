@@ -63,7 +63,7 @@ public sealed class ThemeImporter
             ThemeScanner.Scan(package);
             if (package.Mods.Count == 0 && package.Apps.Count == 0 && package.Wallpapers.Count == 0)
                 throw new InvalidThemeFormatException(
-                    "No theme files were found in it (Windhawk style settings, Windows Terminal or Discord themes, wallpapers).");
+                    "No theme files were found in it (Windhawk style settings, Windows Terminal, Discord, Komorebi or YASB themes, wallpapers).");
 
             ThemeLibrary.Save(package);
             return package;

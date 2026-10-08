@@ -93,6 +93,45 @@ public sealed class PresetServiceTests : IDisposable
         Assert.Equal(2, result.Warnings.Count); // 자동 정렬 + 누락 아이콘
     }
 
+    private sealed class ThreadRecordingTheme(List<string> calls) : IThemeService
+    {
+        public ThemeSettings Capture() => new() { AccentColor = "#123456" };
+        public void Apply(ThemeSettings s) => calls.Add($"theme:{Thread.CurrentThread.GetApartmentState()}:{Environment.CurrentManagedThreadId}");
+        public Rgb GetAccentColor() => Rgb.Parse("#123456");
+    }
+
+    [Fact]
+    public async Task ApplyAsync_runs_desktop_parts_on_a_separate_sta_thread_in_the_same_order()
+    {
+        var svc = new PresetService(new PresetStore(_root), new FakeWallpaper(_calls), new ThreadRecordingTheme(_calls),
+            new FakeIcons(_calls, false), new FakeWidget(_calls));
+        var p = svc.Capture("x");
+        _calls.Clear();
+        var caller = Environment.CurrentManagedThreadId;
+
+        var result = await svc.ApplyAsync(p);
+
+        Assert.Equal(PresetParts.All, result.Applied);
+        Assert.StartsWith("theme:STA:", _calls[0], StringComparison.Ordinal);
+        Assert.NotEqual($"theme:STA:{caller}", _calls[0]);
+        Assert.Equal(["wallpaper", "icons", "widget"], _calls[1..]);
+        Assert.Equal(2, result.Warnings.Count);
+    }
+
+    [Fact]
+    public void Theme_apply_is_skipped_only_when_nothing_would_change()
+    {
+        var current = new ThemeSettings { AppsUseLightTheme = true, SystemUsesLightTheme = true, AccentColor = "#0078D4" };
+        Assert.True(ThemeService.IsCurrent(current, new ThemeSettings { AppsUseLightTheme = true, SystemUsesLightTheme = true, AccentColor = "#0078d4" }));
+        // 라이트 모드에선 작업표시줄 강조색이 꺼진 채로 저장되므로 같은 상태
+        Assert.True(ThemeService.IsCurrent(current, new ThemeSettings
+        {
+            AppsUseLightTheme = true, SystemUsesLightTheme = true, AccentOnStartAndTaskbar = true, AccentColor = "#0078D4",
+        }));
+        Assert.False(ThemeService.IsCurrent(current, new ThemeSettings { AppsUseLightTheme = false, SystemUsesLightTheme = true, AccentColor = "#0078D4" }));
+        Assert.False(ThemeService.IsCurrent(current, new ThemeSettings { AppsUseLightTheme = true, SystemUsesLightTheme = true, AccentColor = "#FF0000" }));
+    }
+
     [Fact]
     public void Overwrite_keeps_id_and_removes_old_images()
     {

@@ -170,11 +170,25 @@ public sealed partial class ManagerViewModel : ObservableObject
 
     private bool HasSelection() => SelectedPreset is not null;
 
+    /// <summary>적용하는 동안 버튼은 비활성화되지만 창은 계속 반응한다.</summary>
     [RelayCommand(CanExecute = nameof(HasSelection))]
-    private void Apply()
+    private async Task ApplyAsync()
     {
         var preset = SelectedPreset!.Preset;
-        Run(() => _tray.ApplyPreset(preset));
+        Status = $"Applying '{preset.Name}'...";
+        try
+        {
+            if (!await _tray.ApplyPresetAsync(preset))
+            {
+                Status = "Another preset is still being applied.";
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            Status = "Error: " + ex.Message;
+            return;
+        }
         LoadWidget();
         ReloadPresets();
         Status = $"Applied '{preset.Name}'";

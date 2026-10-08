@@ -50,6 +50,7 @@ public sealed class DesktopIconService : IDesktopIconService
             .ToDictionary(g => g.Key, g => new Queue<IconPosition>(g), StringComparer.CurrentCultureIgnoreCase);
 
         var moved = 0;
+        var changed = 0;
         var count = remote.Count;
         for (var i = 0; i < count; i++)
         {
@@ -57,11 +58,18 @@ public sealed class DesktopIconService : IDesktopIconService
             if (!pending.TryGetValue(name, out var queue) || queue.Count == 0)
                 continue;
             var target = queue.Dequeue();
-            remote.SetPosition(i, (int)Math.Round(target.X * sx), (int)Math.Round(target.Y * sy));
+            int x = (int)Math.Round(target.X * sx), y = (int)Math.Round(target.Y * sy);
             moved++;
+            // 이미 그 자리에 있으면 건너뜀: 옮길 때마다 탐색기가 다시 그리고 저장해서 아이콘당 ~10ms씩 걸린다
+            var current = remote.GetPosition(i);
+            if (current.X == x && current.Y == y)
+                continue;
+            remote.SetPosition(i, x, y);
+            changed++;
         }
 
-        NativeMethods.SendMessage(remote.Handle, NativeMethods.LVM_REDRAWITEMS, IntPtr.Zero, new IntPtr(count - 1));
+        if (changed > 0)
+            NativeMethods.SendMessage(remote.Handle, NativeMethods.LVM_REDRAWITEMS, IntPtr.Zero, new IntPtr(count - 1));
         var missing = pending.Values.Sum(q => q.Count);
         return new IconApplyResult(moved, missing, autoArrange);
     }

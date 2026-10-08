@@ -23,7 +23,8 @@ public sealed class ThemeListItem(ThemePackage package)
         get
         {
             var parts = Package.Mods.Select(m => WindhawkMods.DisplayName(m.ModId).Split(' ')[0]).ToList();
-            parts.AddRange(Package.Apps.Select(a => a.Kind == AppThemeKind.WindowsTerminal ? "Terminal" : ThemeAppConfig.DisplayName(a.Kind)));
+            parts.AddRange(Package.Apps.OrderBy(a => a.Kind)
+                .Select(a => a.Kind == AppThemeKind.WindowsTerminal ? "Terminal" : ThemeAppConfig.DisplayName(a.Kind)));
             if (Package.Wallpapers.Count > 0)
                 parts.Add($"{Package.Wallpapers.Count} wallpapers");
             return string.Join(" · ", parts);
@@ -50,18 +51,22 @@ public sealed partial class ThemeModRow(ThemeModConfig config, ModState state) :
     [ObservableProperty] private bool _isSelected = state != ModState.NotInstalled;
 }
 
-/// <summary>앱 테마 한 줄 (Windows Terminal / Discord).</summary>
+/// <summary>앱 테마 한 줄 (Windows Terminal / Discord / Komorebi / YASB).</summary>
 public sealed partial class ThemeAppRow : ObservableObject
 {
+    private readonly string _availableSuffix = "";
+    private readonly string _unavailableText = "";
+
     public ThemeAppRow(ThemeAppConfig config, AppThemeTargets targets)
     {
         Config = config;
+        Variants = config.AllVariants();
+        _selectedVariant = Variants[0];
         switch (config.Kind)
         {
             case AppThemeKind.WindowsTerminal:
-                var files = WindowsTerminalThemer.FindSettingsFiles(targets.LocalAppData);
-                IsAvailable = files.Count > 0;
-                StateText = IsAvailable ? config.Summary : "Windows Terminal not found";
+                IsAvailable = WindowsTerminalThemer.FindSettingsFiles(targets.LocalAppData).Count > 0;
+                _unavailableText = "Windows Terminal not found";
                 GetLinkText = "Get Terminal ↗";
                 GetLink = "ms-windows-store://pdp/?productid=9N0DX20HK701";
                 ToolTip = "Adds the theme's color schemes and appearance (font, opacity, padding) to your Terminal settings.\n"
@@ -70,17 +75,35 @@ public sealed partial class ThemeAppRow : ObservableObject
             case AppThemeKind.Discord:
                 var clients = DiscordThemer.FindClients(targets.AppData);
                 IsAvailable = clients.Count > 0;
-                StateText = IsAvailable
-                    ? $"{config.Summary} · {string.Join(", ", clients.Select(c => c.Name))}"
-                    : "needs Vencord or BetterDiscord";
+                _availableSuffix = " · " + string.Join(", ", clients.Select(c => c.Name));
+                _unavailableText = "needs Vencord or BetterDiscord";
                 GetLinkText = "Get Vencord ↗";
                 GetLink = "https://vencord.dev/download/";
                 ToolTip = "Plain Discord cannot load themes. MoniMS puts the theme into a client mod you already use\n"
                           + "(Vencord, Vesktop, Equicord or BetterDiscord) and turns it on.\n"
+                          + "A Discord theme applied earlier from your library is turned off, so the two don't mix.\n"
                           + "Client mods are not allowed by Discord's Terms of Service. Use them at your own risk.";
                 break;
+            case AppThemeKind.Komorebi:
+                IsAvailable = KomorebiThemer.IsInstalled(targets.UserProfile);
+                _unavailableText = "Komorebi not found";
+                GetLinkText = "Get Komorebi ↗";
+                GetLink = "https://github.com/LGUG2Z/komorebi/releases/latest";
+                ToolTip = "Adds the theme's look to your komorebi.json: color theme, borders, padding, transparency and animation.\n"
+                          + "Your monitors, workspaces and rules are kept. If you have no komorebi.json yet, the theme's file is used.\n"
+                          + "whkd key bindings (whkdrc) are added only if you don't have your own.";
+                break;
+            case AppThemeKind.Yasb:
+                IsAvailable = YasbThemer.IsInstalled(targets.UserProfile);
+                _unavailableText = "YASB not found";
+                GetLinkText = "Get YASB ↗";
+                GetLink = "https://github.com/amnweb/yasb/releases/latest";
+                ToolTip = "Replaces your YASB config.yaml (bar layout and widgets) and styles.css with the theme's,\n"
+                          + "because a YASB theme's styles only match its own layout. Press Restore to get yours back.\n"
+                          + "YASB reloads by itself in a moment.";
+                break;
             default:
-                StateText = config.Summary;
+                IsAvailable = false;
                 GetLinkText = "";
                 GetLink = "";
                 ToolTip = "";
@@ -92,10 +115,19 @@ public sealed partial class ThemeAppRow : ObservableObject
     public ThemeAppConfig Config { get; }
     public string Name => ThemeAppConfig.DisplayName(Config.Kind);
     public bool IsAvailable { get; }
-    public string StateText { get; }
     public string GetLinkText { get; }
     public string GetLink { get; }
     public string ToolTip { get; }
+
+    /// <summary>패키지에 이 앱용 테마가 여러 개 있으면 고를 목록을 보여준다.</summary>
+    public IReadOnlyList<ThemeAppVariant> Variants { get; }
+    public bool HasVariants => Variants.Count > 1;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(StateText))]
+    private ThemeAppVariant _selectedVariant;
+
+    public string StateText => IsAvailable ? SelectedVariant.Summary + _availableSuffix : _unavailableText;
 
     [ObservableProperty] private bool _isSelected;
 }
@@ -207,8 +239,15 @@ public sealed partial class ShellThemesViewModel : ObservableObject, IDisposable
         UpdateBackupState();
     }
 
+    private string? _detailsPackageId;
+
     private void LoadDetails(ThemePackage? package)
     {
+        // 같은 테마를 다시 불러올 때(적용 후 상태 갱신)는 고른 앱 테마를 유지
+        var keep = package is not null && package.Id == _detailsPackageId
+            ? AppRows.ToDictionary(r => r.Config.Kind, r => r.SelectedVariant.SourceFile)
+            : [];
+        _detailsPackageId = package?.Id;
         ModRows.Clear();
         AppRows.Clear();
         Wallpapers.Clear();
@@ -226,7 +265,12 @@ public sealed partial class ShellThemesViewModel : ObservableObject, IDisposable
         foreach (var mod in package.Mods.OrderBy(m => WindhawkMods.All.ToList().IndexOf(m.ModId)))
             ModRows.Add(new ThemeModRow(mod, _storage.GetModState(mod.ModId)));
         foreach (var app in package.Apps.OrderBy(a => a.Kind))
-            AppRows.Add(new ThemeAppRow(app, _applier.Targets));
+        {
+            var row = new ThemeAppRow(app, _applier.Targets);
+            if (keep.TryGetValue(app.Kind, out var file) && row.Variants.FirstOrDefault(v => v.SourceFile == file) is { } variant)
+                row.SelectedVariant = variant;
+            AppRows.Add(row);
+        }
         HasCustomScript = package.Mods.Any(m => m.HasCustomScript);
         OtherItemsText = package.OtherItems.Count == 0 ? null : string.Join(", ", package.OtherItems);
 
@@ -280,7 +324,10 @@ public sealed partial class ShellThemesViewModel : ObservableObject, IDisposable
         try
         {
             var progress = new Progress<string>(s => Status = s);
-            var package = await _importer.ImportAsync(ImportText, progress);
+            // 로컬 파일은 압축 풀기·분석이 전부 동기라서 UI 스레드에서 돌면 창이 멈추고,
+            // 진행 메시지("Analyzing...")가 완료 메시지 뒤에 도착해 그대로 남는다
+            var input = ImportText;
+            var package = await Task.Run(() => _importer.ImportAsync(input, progress));
             ImportText = "";
             Refresh();
             SelectedTheme = Themes.FirstOrDefault(t => t.Package.Id == package.Id);
@@ -343,7 +390,9 @@ public sealed partial class ShellThemesViewModel : ObservableObject, IDisposable
     {
         var package = SelectedTheme!.Package;
         var modIds = ModRows.Where(r => r.IsSelected && r.IsInstalled).Select(r => r.Config.ModId).ToList();
-        var apps = AppRows.Where(r => r.IsSelected && r.IsAvailable).Select(r => r.Config.Kind).ToList();
+        var chosenApps = AppRows.Where(r => r.IsSelected && r.IsAvailable).ToList();
+        var apps = chosenApps.Select(r => r.Config.Kind).ToList();
+        var variants = chosenApps.ToDictionary(r => r.Config.Kind, r => r.SelectedVariant.SourceFile);
         var wallpaper = ApplyWallpaper ? SelectedWallpaper?.RelativePath ?? package.Wallpapers.FirstOrDefault() : null;
         if (modIds.Count == 0 && apps.Count == 0 && wallpaper is null)
         {
@@ -355,7 +404,7 @@ public sealed partial class ShellThemesViewModel : ObservableObject, IDisposable
         Status = "Applying...";
         try
         {
-            var options = new ThemeApplyOptions(modIds, AllowCustomScript, wallpaper, apps);
+            var options = new ThemeApplyOptions(modIds, AllowCustomScript, wallpaper, apps, variants);
             // 관리자 권한 헬퍼를 기다릴 수 있으므로 UI 스레드 밖에서
             var result = modIds.Count > 0 || apps.Count > 0
                 ? await Task.Run(() => _applier.Apply(package, options))
@@ -394,7 +443,7 @@ public sealed partial class ShellThemesViewModel : ObservableObject, IDisposable
     {
         if (MessageBox.Show(
                 "Go back to how Windows looked before you applied any theme from the library?\n\n"
-                + "This undoes every theme apply at once: taskbar & Start menu (Windhawk), Windows Terminal, Discord and wallpaper.",
+                + "This undoes every theme apply at once: taskbar & Start menu (Windhawk), Windows Terminal, Discord, Komorebi, YASB and wallpaper.",
                 "MoniMS", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
             return;
         IsBusy = true;
@@ -430,7 +479,7 @@ public sealed partial class ShellThemesViewModel : ObservableObject, IDisposable
     [RelayCommand(CanExecute = nameof(CanRestore))]
     private async Task RestoreAsync()
     {
-        if (MessageBox.Show($"Restore the settings saved {BackupLabel}?\n(Windhawk mods, Windows Terminal and Discord theme files)", "MoniMS",
+        if (MessageBox.Show($"Restore the settings saved {BackupLabel}?\n(Windhawk mods, Windows Terminal, Discord, Komorebi and YASB files)", "MoniMS",
                 MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
             return;
         IsBusy = true;

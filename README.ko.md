@@ -1,6 +1,6 @@
 # MoniMS
 
-**Windows 11 바탕화면 도우미:** 바탕화면 프리셋 전환, 실시간 시스템 정보 위젯, 작업표시줄·시작 메뉴·터미널·디스코드 테마 적용을 한곳에서 할 수 있어요.
+**Windows 11 바탕화면 도우미:** 바탕화면 프리셋 전환, 실시간 시스템 정보 위젯, 작업표시줄·시작 메뉴·터미널·디스코드·Komorebi·YASB 테마 적용을 한곳에서 할 수 있어요.
 
 [English →](README.md)
 
@@ -36,22 +36,27 @@
 > 아이콘 배치는 **위치만** 되돌려요. 바탕화면에서 지운 파일이나 바로가기는 다시 생기지 않아요.
 > 아이콘 위치를 유지하려면 바탕화면 우클릭 → **보기 → 아이콘 자동 정렬**을 꺼 주세요.
 
-### 🧩 테마: 작업표시줄·시작 메뉴·터미널·디스코드
-인터넷에 공유된 테마(예: *Gruvbox Material*) 하나로 여러 곳의 모양을 한 번에 바꿔요.
+### 🧩 테마: 작업표시줄·시작 메뉴·터미널·디스코드·Komorebi·YASB
+인터넷에 공유된 테마(예: *Gruvbox Material*, 다른 사람의 dotfiles 저장소) 하나로 여러 곳의 모양을 한 번에 바꿔요.
 
 | 부분 | MoniMS가 바꾸는 것 | 필요한 것 |
 |---|---|---|
 | 작업표시줄, 시작 메뉴, 알림 센터 | Windhawk 모드 설정 | **[Windhawk](https://windhawk.net)**와 테마가 쓰는 모드 |
 | Windows Terminal | 색 구성표와 모양(글꼴, 투명도, 여백)을 내 설정에 추가. 프로필·단축키는 그대로 둬요. | Windows Terminal |
-| Discord | `.theme.css`를 클라이언트 모드의 테마 폴더에 넣고 켜요 | **Vencord**, Vesktop, Equicord, BetterDiscord 중 하나 (순정 Discord는 테마를 못 써요) |
+| Discord | 테마를 클라이언트 모드의 테마 폴더에 넣고 켜요. 전에 라이브러리에서 적용한 Discord 테마는 꺼요. | **Vencord**, Vesktop, Equicord, BetterDiscord 중 하나 (순정 Discord는 테마를 못 써요) |
+| Komorebi | 모양(색 테마, 테두리, 여백, 투명도, 애니메이션)을 내 `komorebi.json`에 추가. 모니터·작업 공간·규칙은 그대로 둬요. whkd 단축키는 없을 때만 넣어요. | **[komorebi](https://github.com/LGUG2Z/komorebi)** |
+| YASB | `config.yaml`과 `styles.css`를 테마의 것으로 바꿔요 (YASB 테마의 스타일은 그 테마의 막대 구성에만 맞아요) | **[YASB](https://github.com/amnweb/yasb)** |
+
+한 패키지에 같은 앱용 테마가 여러 개 있으면(예: Discord 테마 두 개) 그 앱 아래 목록에서 하나를 고르세요.
 
 1. **Settings → Themes**에서 GitHub 링크나 `.zip` 링크를 붙여넣거나, 내 PC의 파일(`.zip`, `.json`, `.css`, 폴더)을 골라 **Import**를 누르세요.
 2. 적용할 부분을 체크하세요. 테마에 들어 있는 배경화면도 함께 고를 수 있어요.
 3. **Apply**를 누르세요. Windhawk 설정이 바뀔 때는 Windows 권한 확인 창이 한 번 떠요.
 
-- **없는 게 있을 때:** **Install mod**, **Get Terminal**, **Get Vencord** 링크가 보여요.
+- **없는 게 있을 때:** **Install mod**, **Get Terminal**, **Get Vencord**, **Get Komorebi**, **Get YASB** 링크가 보여요.
 - **글꼴:** 테마가 특정 글꼴을 쓰는 경우가 많아요(Gruvbox는 *JetBrainsMono Nerd Font*, *DM Mono*). 설치돼 있지 않으면 지금 글꼴을 그대로 두고 알려 줘요.
 - **Discord:** 적용한 뒤 Discord를 트레이에서까지 완전히 종료했다가 다시 켜세요.
+- **Komorebi·YASB:** YASB는 알아서 다시 불러와요. 실행 중인 komorebi에는 새 설정을 불러오게 하고, 안 되면 komorebi를 다시 켜 달라고 알려 줘요.
 - **되돌리기:** 바꾸기 전 상태가 자동으로 백업돼요. **Restore**는 마지막 적용 하나만 되돌리고, 라이브러리 위 ↻ 옆의 **Reset**은 테마를 처음 적용하기 전 모습(배경화면 포함)으로 한 번에 되돌려요.
 - **커스텀 스크립트:** 스크립트가 들어 있는 테마는 직접 허용하지 않으면 스크립트를 빼고 적용해요.
 

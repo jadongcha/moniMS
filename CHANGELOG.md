@@ -6,6 +6,22 @@ Write upcoming changes under **[Unreleased]**; `release.ps1` moves them into the
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-10-08
+
+### Added
+- Themes can now restyle **Komorebi**: the color theme, borders, padding, transparency and animation are added to your `komorebi.json` (your workspaces and rules are kept). A running komorebi loads the new settings right away.
+- Themes can now restyle **YASB**: the theme's `config.yaml` and `styles.css` are put into your YASB folder, and YASB reloads by itself.
+- If a theme has more than one theme for the same app (for example two Discord themes or two YASB bars), you can pick which one to apply.
+
+### Changed
+- Applying a Discord theme turns off the Discord theme you applied earlier from the library, so the two don't mix. Themes you added yourself are left alone.
+- Applying a preset no longer freezes MoniMS. Parts that are already as saved (theme colors, icon positions) are skipped, so switching presets is also faster.
+- Importing a theme from a file or folder no longer freezes the Settings window.
+
+### Fixed
+- Discord themes shared without a `.css` extension (for example "Discord/Current Theme" in dotfiles repos) were not found.
+- After importing from a file or folder, the status stayed on "Analyzing...".
+
 ## [0.2.1] - 2026-10-08
 
 ### Added

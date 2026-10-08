@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using MoniMS.Core.Shell.Apps;
 
 namespace MoniMS.Core.Shell;
@@ -23,13 +24,14 @@ public static class ThemeScanner
 
         var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var all = SafeEnumerate(root).ToList();
+        var komorebi = new List<ThemeAppVariant>();
 
         foreach (var file in all.Where(f => f.EndsWith(".json", StringComparison.OrdinalIgnoreCase)).OrderBy(f => f))
         {
             var settings = TryReadFlatSettings(file);
             if (settings is null || settings.Count == 0)
             {
-                // Windhawk 형식이 아니면 Windows Terminal 설정/색 구성표인지 확인
+                // Windhawk 형식이 아니면 Windows Terminal 설정/색 구성표 → komorebi.json 순으로 확인
                 if (!package.Apps.Any(a => a.Kind == AppThemeKind.WindowsTerminal) &&
                     WindowsTerminalThemer.TryLoadSource(file) is { } terminal)
                 {
@@ -38,6 +40,16 @@ public static class ThemeScanner
                         Kind = AppThemeKind.WindowsTerminal,
                         SourceFile = Path.GetRelativePath(files, file),
                         Summary = WindowsTerminalThemer.Summarize(terminal),
+                    });
+                    used.Add(Path.GetDirectoryName(file)!);
+                }
+                else if (TryReadJsonObject(file) is { } obj && KomorebiThemer.IsConfig(file, obj))
+                {
+                    komorebi.Add(new ThemeAppVariant
+                    {
+                        Name = VariantName(root, file),
+                        SourceFile = Path.GetRelativePath(files, file),
+                        Summary = KomorebiThemer.Summarize(obj),
                     });
                     used.Add(Path.GetDirectoryName(file)!);
                 }
@@ -57,21 +69,43 @@ public static class ThemeScanner
             used.Add(Path.GetDirectoryName(file)!);
         }
 
-        // Discord 테마 (.theme.css): .theme.css를 먼저, 그다음 이름순
-        var discord = all.Where(f => f.EndsWith(".css", StringComparison.OrdinalIgnoreCase))
+        // Discord 테마 (.theme.css, 또는 Discord 폴더 안의 css / 확장자 없는 테마): .theme.css를 먼저, 그다음 이름순
+        var discord = all
+            .Where(f => DiscordThemer.LooksLikeDiscordTheme(Path.GetRelativePath(root, f), f))
             .OrderBy(f => f.EndsWith(".theme.css", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
             .ThenBy(f => f, StringComparer.OrdinalIgnoreCase)
-            .FirstOrDefault(f => DiscordThemer.LooksLikeDiscordTheme(Path.GetRelativePath(root, f), f));
-        if (discord is not null)
-        {
-            package.Apps.Add(new ThemeAppConfig
+            .Select(f =>
             {
-                Kind = AppThemeKind.Discord,
-                SourceFile = Path.GetRelativePath(files, discord),
-                Summary = DiscordThemer.ReadThemeName(discord) is { } n ? $"theme '{n}'" : Path.GetFileName(discord),
-            });
-            used.Add(Path.GetDirectoryName(discord)!);
-        }
+                var name = DiscordThemer.ReadThemeName(f);
+                return new ThemeAppVariant
+                {
+                    Name = name ?? Path.GetFileName(f),
+                    SourceFile = Path.GetRelativePath(files, f),
+                    Summary = name is not null ? $"theme '{name}'" : Path.GetFileName(f),
+                };
+            })
+            .ToList();
+        AddApp(package, AppThemeKind.Discord, discord, used);
+        AddApp(package, AppThemeKind.Komorebi, komorebi, used);
+
+        // YASB: config.yaml(막대 구성) + styles.css 가 있는 폴더 하나가 테마 하나. 얕은 폴더(기본 테마)를 먼저.
+        var yasb = all.Where(f => YasbThemer.IsConfig(f) || YasbThemer.IsStylesheet(f))
+            .Select(f => Path.GetDirectoryName(f)!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(d => d.Count(c => c == Path.DirectorySeparatorChar))
+            .ThenBy(d => d, StringComparer.OrdinalIgnoreCase)
+            .Select(d =>
+            {
+                var (config, styles) = YasbThemer.FilesIn(d);
+                return new ThemeAppVariant
+                {
+                    Name = Path.GetFileName(d),
+                    SourceFile = Path.GetRelativePath(files, config ?? styles!),
+                    Summary = $"'{Path.GetFileName(d)}' {YasbThemer.Summarize(config, styles)}",
+                };
+            })
+            .ToList();
+        AddApp(package, AppThemeKind.Yasb, yasb, used);
 
         foreach (var file in all.Where(IsImage).Where(f => Path.GetRelativePath(root, f).Contains("wallpaper", StringComparison.OrdinalIgnoreCase))
                      .OrderBy(f => f, StringComparer.OrdinalIgnoreCase).Take(MaxWallpapers))
@@ -93,6 +127,42 @@ public static class ThemeScanner
         }
 
         package.Description ??= ReadReadmeTitle(root);
+    }
+
+    /// <summary>같은 앱용 테마 목록을 하나의 앱 항목으로 (여러 개면 고를 수 있게 Variants에 전부).</summary>
+    private static void AddApp(ThemePackage package, AppThemeKind kind, List<ThemeAppVariant> variants, HashSet<string> used)
+    {
+        if (variants.Count == 0)
+            return;
+        var first = variants[0];
+        package.Apps.Add(new ThemeAppConfig
+        {
+            Kind = kind,
+            SourceFile = first.SourceFile,
+            Summary = variants.Count > 1 ? $"{first.Summary} (+{variants.Count - 1} more)" : first.Summary,
+            Variants = variants.Count > 1 ? variants : [],
+        });
+        foreach (var v in variants)
+            used.Add(Path.GetDirectoryName(package.FullPath(v.SourceFile))!);
+    }
+
+    /// <summary>테마 이름 표시용: 파일이 든 폴더 이름 (최상위면 파일 이름).</summary>
+    private static string VariantName(string root, string file)
+    {
+        var dir = Path.GetDirectoryName(file)!;
+        return dir.Equals(root, StringComparison.OrdinalIgnoreCase) ? Path.GetFileName(file) : Path.GetFileName(dir);
+    }
+
+    private static JsonObject? TryReadJsonObject(string file)
+    {
+        try
+        {
+            return new FileInfo(file).Length > MaxJsonBytes ? null : JsonText.ParseFile(file) as JsonObject;
+        }
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
     }
 
     /// <summary>Windhawk 설정 JSON(평평한 키 → 문자열/정수)을 읽는다. 형식이 다르면 null.</summary>

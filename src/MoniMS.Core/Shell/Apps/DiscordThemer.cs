@@ -51,16 +51,43 @@ public static partial class DiscordThemer
             return running;
         });
 
-    /// <summary>테마 파일인지 판별: .theme.css 이거나, discord 폴더 안의 css이거나, @name 메타가 있는 css.</summary>
+    /// <summary>
+    /// 테마 파일인지 판별: .theme.css 이거나, discord 폴더 안의 css이거나, @name 메타가 있는 css.
+    /// 확장자 없이 공유된 테마("Discord/Current Theme")도 discord 폴더 안에 있고 @name 메타가 있으면 인정.
+    /// </summary>
     public static bool LooksLikeDiscordTheme(string relativePath, string file)
     {
+        var inDiscordFolder = relativePath.Contains("discord", StringComparison.OrdinalIgnoreCase);
+        if (Path.GetExtension(file).Length == 0)
+            return inDiscordFolder && ReadThemeName(file) is not null;
         if (!file.EndsWith(".css", StringComparison.OrdinalIgnoreCase))
             return false;
-        if (file.EndsWith(".theme.css", StringComparison.OrdinalIgnoreCase) ||
-            relativePath.Contains("discord", StringComparison.OrdinalIgnoreCase))
+        if (file.EndsWith(".theme.css", StringComparison.OrdinalIgnoreCase) || inDiscordFolder)
             return true;
         return ReadThemeName(file) is not null && relativePath.Contains("vencord", StringComparison.OrdinalIgnoreCase);
     }
+
+    /// <summary>
+    /// 클라이언트 테마 폴더에 넣을 파일 이름과 테마 이름. Vencord는 .css 파일만, BetterDiscord는 .theme.css만 읽으므로
+    /// 확장자가 없는 파일은 @name으로 "system24-catppuccin-mocha.theme.css" 같은 이름을 만든다.
+    /// </summary>
+    public static (string FileName, string ThemeName) Identify(string sourceFile)
+    {
+        var fileName = Path.GetFileName(sourceFile);
+        var name = ReadThemeName(sourceFile);
+        if (!fileName.EndsWith(".css", StringComparison.OrdinalIgnoreCase))
+        {
+            var slug = Slug(name ?? fileName);
+            fileName = (slug.Length > 0 ? slug : "theme") + ".theme.css";
+        }
+        return (fileName, name ?? Path.GetFileNameWithoutExtension(fileName).Replace(".theme", "", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string Slug(string text) =>
+        SlugRegex().Replace(text.ToLowerInvariant(), "-").Trim('-');
+
+    [GeneratedRegex(@"[^a-z0-9]+")]
+    private static partial Regex SlugRegex();
 
     /// <summary>테마 머리말의 "@name ..." (BetterDiscord는 이 이름으로 켜짐 상태를 저장).</summary>
     public static string? ReadThemeName(string file)
@@ -102,9 +129,13 @@ public static partial class DiscordThemer
     [GeneratedRegex(@"--(?:code-)?font\s*:\s*['""]([^'""]*)['""]")]
     private static partial Regex FontRegex();
 
-    /// <summary>찾은 모든 클라이언트에 테마를 넣고 켠다. 적용한 클라이언트 이름 목록 반환.</summary>
+    /// <summary>
+    /// 찾은 모든 클라이언트에 테마를 넣고 켠다. 적용한 클라이언트 이름 목록 반환.
+    /// <paramref name="replaces"/>: 이 테마로 바꾸면서 끌 테마들 (MoniMS 보관함에서 예전에 켠 테마). 사용자가 직접 넣은 테마는 건드리지 않는다.
+    /// </summary>
     public static IReadOnlyList<string> Apply(string sourceCss, FileJournal journal, List<string> warnings,
-        string? appData = null, Func<string, bool>? fontInstalled = null)
+        string? appData = null, Func<string, bool>? fontInstalled = null,
+        IReadOnlyCollection<(string FileName, string ThemeName)>? replaces = null)
     {
         var clients = FindClients(appData);
         if (clients.Count == 0)
@@ -113,8 +144,8 @@ public static partial class DiscordThemer
             return [];
         }
 
-        var fileName = Path.GetFileName(sourceCss);
-        var themeName = ReadThemeName(sourceCss) ?? Path.GetFileNameWithoutExtension(fileName).Replace(".theme", "", StringComparison.OrdinalIgnoreCase);
+        var (fileName, themeName) = Identify(sourceCss);
+        var others = (replaces ?? []).Where(r => !string.Equals(r.FileName, fileName, StringComparison.OrdinalIgnoreCase)).ToList();
         var applied = new List<string>();
 
         foreach (var client in clients)
@@ -134,9 +165,19 @@ public static partial class DiscordThemer
                     enabled = new JsonArray();
                     settings["enabledThemes"] = enabled;
                 }
+                var changed = false;
+                foreach (var stale in enabled.Where(e => others.Any(o => string.Equals(o.FileName, e?.GetValue<string>(), StringComparison.OrdinalIgnoreCase))).ToList())
+                {
+                    enabled.Remove(stale); // 두 테마가 겹쳐 보이지 않도록 예전 테마는 끈다
+                    changed = true;
+                }
                 if (!enabled.Any(e => e?.GetValue<string>() == fileName))
                 {
                     enabled.Add(fileName);
+                    changed = true;
+                }
+                if (changed)
+                {
                     journal.Record(settingsPath);
                     JsonText.Write(settingsPath, settings);
                 }
@@ -152,6 +193,8 @@ public static partial class DiscordThemer
                 {
                     var statePath = Path.Combine(channel, "themes.json");
                     var state = JsonText.ParseFile(statePath) as JsonObject ?? new JsonObject();
+                    foreach (var other in others.Where(o => state.ContainsKey(o.ThemeName)))
+                        state[other.ThemeName] = false;
                     state[themeName] = true;
                     journal.Record(statePath);
                     JsonText.Write(statePath, state);

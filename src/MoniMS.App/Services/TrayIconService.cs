@@ -50,16 +50,32 @@ public sealed class TrayIconService : IDisposable
     public void Notify(string title, string message, bool warning = false) =>
         _icon.ShowBalloonTip(4000, title, message, warning ? WinForms.ToolTipIcon.Warning : WinForms.ToolTipIcon.Info);
 
-    /// <summary>프리셋 적용 + 결과 알림. 설정 창에서도 사용.</summary>
-    public void ApplyPreset(Preset preset)
+    private bool _applying;
+
+    /// <summary>
+    /// 프리셋 적용 + 결과 알림. 설정 창에서도 사용. 적용하는 동안 UI는 멈추지 않는다.
+    /// 다른 프리셋을 적용하는 중이면 false (연달아 눌러서 두 프리셋이 섞이지 않도록).
+    /// </summary>
+    public async Task<bool> ApplyPresetAsync(Preset preset)
     {
-        var result = _presets.Apply(preset);
-        _settings.Current.LastAppliedPresetId = preset.Id;
-        _settings.Save();
-        if (result.Warnings.Count > 0)
-            Notify($"Applied '{preset.Name}' with issues", string.Join("\n", result.Warnings), warning: true);
-        else
-            Notify("Preset applied", $"Applied '{preset.Name}'.");
+        if (_applying)
+            return false;
+        _applying = true;
+        try
+        {
+            var result = await _presets.ApplyAsync(preset);
+            _settings.Current.LastAppliedPresetId = preset.Id;
+            _settings.Save();
+            if (result.Warnings.Count > 0)
+                Notify($"Applied '{preset.Name}' with issues", string.Join("\n", result.Warnings), warning: true);
+            else
+                Notify("Preset applied", $"Applied '{preset.Name}'.");
+            return true;
+        }
+        finally
+        {
+            _applying = false;
+        }
     }
 
     private void BuildMenu()
@@ -73,7 +89,7 @@ public sealed class TrayIconService : IDisposable
         _menu.Items.Add(new WinForms.ToolStripSeparator());
 
         // 프리셋 목록
-        var presetMenu = new WinForms.ToolStripMenuItem("Apply preset");
+        var presetMenu = new WinForms.ToolStripMenuItem(_applying ? "Applying preset..." : "Apply preset") { Enabled = !_applying };
         var all = _presets.GetAll();
         if (all.Count == 0)
             presetMenu.DropDownItems.Add(new WinForms.ToolStripMenuItem("(no saved presets)") { Enabled = false });
@@ -84,7 +100,18 @@ public sealed class TrayIconService : IDisposable
                 Checked = p.Id == _settings.Current.LastAppliedPresetId,
             };
             var captured = p;
-            item.Click += (_, _) => Run(() => ApplyPreset(captured));
+            item.Click += async (_, _) =>
+            {
+                try
+                {
+                    await ApplyPresetAsync(captured);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Applying preset from the tray failed");
+                    Notify("Error", ex.Message, warning: true);
+                }
+            };
             presetMenu.DropDownItems.Add(item);
         }
         _menu.Items.Add(presetMenu);

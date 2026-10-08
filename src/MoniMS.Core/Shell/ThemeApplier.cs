@@ -15,11 +15,13 @@ public interface IWindhawkSettingsWriter
     void Write(IReadOnlyList<ModSettingsWrite> items);
 }
 
+/// <param name="AppVariants">앱별로 고른 테마 파일 (files\ 기준 상대 경로). 없으면 그 앱의 기본 테마.</param>
 public sealed record ThemeApplyOptions(
     IReadOnlyCollection<string> ModIds,
     bool AllowCustomScript,
     string? WallpaperRelativePath,
-    IReadOnlyCollection<AppThemeKind>? Apps = null);
+    IReadOnlyCollection<AppThemeKind>? Apps = null,
+    IReadOnlyDictionary<AppThemeKind, string>? AppVariants = null);
 
 public sealed record ThemeApplyResult(
     IReadOnlyList<string> AppliedMods,
@@ -31,9 +33,16 @@ public sealed record ThemeApplyResult(
 }
 
 /// <summary>앱 테마를 적용할 위치. 테스트에서는 임시 폴더를 넘긴다.</summary>
-public sealed record AppThemeTargets(string? LocalAppData = null, string? AppData = null, Func<string, bool>? FontInstalled = null)
+public sealed record AppThemeTargets(
+    string? LocalAppData = null,
+    string? AppData = null,
+    Func<string, bool>? FontInstalled = null,
+    string? UserProfile = null)
 {
     public static readonly AppThemeTargets System = new();
+
+    /// <summary>실제 위치에 적용하는지 (그때만 실행 중인 앱에 다시 불러오라고 알린다).</summary>
+    public bool IsSystem => LocalAppData is null && AppData is null && UserProfile is null;
 }
 
 /// <summary>테마 적용 / 이전 설정 백업·복원.</summary>
@@ -60,7 +69,7 @@ public sealed class ThemeApplier
     public AppThemeTargets Targets => _targets;
 
     /// <summary>
-    /// Windhawk 설정 + 앱 테마(Terminal, Discord) 적용 (백그라운드 스레드에서 호출 가능).
+    /// Windhawk 설정 + 앱 테마(Terminal, Discord, Komorebi, YASB) 적용 (백그라운드 스레드에서 호출 가능).
     /// 바꾸기 전 상태는 한 개의 백업 파일에 모아 두어 Restore 한 번으로 되돌린다.
     /// </summary>
     public ThemeApplyResult Apply(ThemePackage package, ThemeApplyOptions options)
@@ -82,7 +91,7 @@ public sealed class ThemeApplier
         try
         {
             foreach (var app in package.Apps.Where(a => options.Apps?.Contains(a.Kind) == true))
-                ApplyApp(package, app, journal, warnings, appliedApps);
+                ApplyApp(package, app, options.AppVariants?.GetValueOrDefault(app.Kind), journal, warnings, appliedApps);
         }
         finally
         {
@@ -128,12 +137,15 @@ public sealed class ThemeApplier
         return writes;
     }
 
-    private void ApplyApp(ThemePackage package, ThemeAppConfig app, FileJournal journal, List<string> warnings, List<string> applied)
+    private void ApplyApp(ThemePackage package, ThemeAppConfig app, string? variant, FileJournal journal, List<string> warnings, List<string> applied)
     {
         var name = ThemeAppConfig.DisplayName(app.Kind);
         try
         {
-            var source = package.FullPath(app.SourceFile);
+            // 고른 테마가 이 패키지의 것인지 확인 (아니면 기본 테마)
+            var chosen = app.AllVariants().FirstOrDefault(v => v.SourceFile.Equals(variant, StringComparison.OrdinalIgnoreCase))
+                         ?? app.AllVariants()[0];
+            var source = package.FullPath(chosen.SourceFile);
             switch (app.Kind)
             {
                 case AppThemeKind.WindowsTerminal:
@@ -141,9 +153,22 @@ public sealed class ThemeApplier
                         applied.Add(name);
                     break;
                 case AppThemeKind.Discord:
-                    var clients = DiscordThemer.Apply(source, journal, warnings, _targets.AppData, _targets.FontInstalled);
+                    var clients = DiscordThemer.Apply(source, journal, warnings, _targets.AppData, _targets.FontInstalled,
+                        LibraryDiscordThemes(package));
                     if (clients.Count > 0)
                         applied.Add($"{name} ({string.Join(", ", clients)})");
+                    break;
+                case AppThemeKind.Komorebi:
+                    if (!KomorebiThemer.IsInstalled(_targets.UserProfile))
+                        warnings.Add("Komorebi is not installed, skipped.");
+                    else if (KomorebiThemer.Apply(source, journal, warnings, _targets.UserProfile, reload: _targets.IsSystem) > 0)
+                        applied.Add(name);
+                    break;
+                case AppThemeKind.Yasb:
+                    if (!YasbThemer.IsInstalled(_targets.UserProfile))
+                        warnings.Add("YASB is not installed, skipped.");
+                    else if (YasbThemer.Apply(source, journal, warnings, _targets.UserProfile, _targets.FontInstalled) > 0)
+                        applied.Add(Path.GetFileName(Path.GetDirectoryName(source)) is { } folder && app.Variants.Count > 0 ? $"{name} ({folder})" : name);
                     break;
             }
         }
@@ -153,6 +178,24 @@ public sealed class ThemeApplier
             _logger.LogWarning(ex, "Applying {App} theme failed", name);
             warnings.Add($"{name}: could not apply ({ex.Message}).");
         }
+    }
+
+    /// <summary>
+    /// 보관함에 있는 모든 Discord 테마. 새 테마를 켤 때 예전에 MoniMS로 켠 테마를 꺼서 두 테마가 겹치지 않게 한다.
+    /// </summary>
+    private List<(string FileName, string ThemeName)> LibraryDiscordThemes(ThemePackage current)
+    {
+        var result = new List<(string, string)>();
+        foreach (var p in _library.GetAll().Where(p => p.Id != current.Id).Append(current))
+        {
+            foreach (var variant in p.Apps.Where(a => a.Kind == AppThemeKind.Discord).SelectMany(a => a.AllVariants()))
+            {
+                var file = p.FullPath(variant.SourceFile);
+                if (File.Exists(file))
+                    result.Add(DiscordThemer.Identify(file));
+            }
+        }
+        return result;
     }
 
     /// <summary>배경화면 적용 (COM이라 UI 스레드에서 호출).</summary>
@@ -344,9 +387,12 @@ public sealed class ThemeApplier
                     Directory.CreateDirectory(Path.GetDirectoryName(path)!);
                     File.WriteAllText(path, original, new System.Text.UTF8Encoding(false));
                 }
-                var label = path.Contains("Terminal", StringComparison.OrdinalIgnoreCase) ? "Windows Terminal" : "Discord";
+                var label = ThemeAppConfig.DisplayNameForPath(path);
                 if (!restored.Contains(label))
                     restored.Add(label);
+                if (_targets.IsSystem && original is not null &&
+                    Path.GetFileName(path).Equals(KomorebiThemer.ConfigFileName, StringComparison.OrdinalIgnoreCase))
+                    KomorebiThemer.Reload(path); // 실행 중인 komorebi에 되돌린 설정을 불러오게
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {

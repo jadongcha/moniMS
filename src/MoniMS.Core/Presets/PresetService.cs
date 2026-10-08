@@ -95,11 +95,55 @@ public sealed class PresetService
     public PresetApplyResult Apply(Preset preset, PresetParts parts = PresetParts.All)
     {
         var warnings = new List<string>();
+        parts &= preset.AvailableParts;
+        var applied = ApplyDesktop(preset, parts, warnings) | ApplyWidget(preset, parts, warnings);
+        PresetApplied?.Invoke(this, preset);
+        return new PresetApplyResult(applied, warnings);
+    }
+
+    /// <summary>
+    /// <see cref="Apply"/>와 같지만 UI가 멈추지 않는다. 바탕화면 쪽(테마 변경 알림은 모든 창의 응답을 기다리고,
+    /// 배경화면·아이콘은 탐색기를 기다린다)은 별도 STA 스레드에서, 위젯은 호출한 UI 스레드에서 적용한다.
+    /// </summary>
+    public async Task<PresetApplyResult> ApplyAsync(Preset preset, PresetParts parts = PresetParts.All)
+    {
+        var warnings = new List<string>();
+        parts &= preset.AvailableParts;
+        var applied = await RunOnStaThread(() => ApplyDesktop(preset, parts, warnings));
+        applied |= ApplyWidget(preset, parts, warnings); // await 뒤라 다시 호출한 (UI) 스레드
+        PresetApplied?.Invoke(this, preset);
+        return new PresetApplyResult(applied, warnings);
+    }
+
+    private static Task<T> RunOnStaThread<T>(Func<T> action)
+    {
+        var tcs = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                tcs.SetResult(action());
+            }
+            catch (Exception ex)
+            {
+                tcs.SetException(ex);
+            }
+        })
+        {
+            IsBackground = true,
+            Name = "MoniMS.PresetApply",
+        };
+        thread.SetApartmentState(ApartmentState.STA); // 배경화면 COM
+        thread.Start();
+        return tcs.Task;
+    }
+
+    /// <summary>테마 → 배경화면 (자동 강조색이 배경화면을 따라가므로) → 아이콘. UI 스레드가 아니어도 된다.</summary>
+    private PresetParts ApplyDesktop(Preset preset, PresetParts parts, List<string> warnings)
+    {
         var applied = PresetParts.None;
         var dir = _store.GetPresetDirectory(preset.Id);
-        parts &= preset.AvailableParts;
 
-        // 순서: 테마 → 배경화면 (자동 강조색이 배경화면을 따라가므로) → 아이콘 → 위젯
         if (parts.HasFlag(PresetParts.Theme) && Try(() => _theme.Apply(preset.Theme!), "Theme", warnings))
             applied |= PresetParts.Theme;
 
@@ -119,13 +163,14 @@ public sealed class PresetService
             if (ok)
                 applied |= PresetParts.Icons;
         }
-
-        if (parts.HasFlag(PresetParts.Widget) && Try(() => _widget.ApplyLayout(preset.Widget!.Clone()), "Widget", warnings))
-            applied |= PresetParts.Widget;
-
-        PresetApplied?.Invoke(this, preset);
-        return new PresetApplyResult(applied, warnings);
+        return applied;
     }
+
+    /// <summary>위젯 창을 바꾸므로 UI 스레드에서.</summary>
+    private PresetParts ApplyWidget(Preset preset, PresetParts parts, List<string> warnings) =>
+        parts.HasFlag(PresetParts.Widget) && Try(() => _widget.ApplyLayout(preset.Widget!.Clone()), "Widget", warnings)
+            ? PresetParts.Widget
+            : PresetParts.None;
 
     public void Rename(Preset preset, string newName)
     {

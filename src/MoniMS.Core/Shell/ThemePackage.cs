@@ -9,8 +9,11 @@ namespace MoniMS.Core.Shell;
 /// </summary>
 public sealed class ThemePackage
 {
-    /// <summary>2: 앱 테마(Apps) 추가. 이보다 낮은 매니페스트는 불러올 때 다시 분석한다.</summary>
-    public const int CurrentSchemaVersion = 2;
+    /// <summary>
+    /// 2: 앱 테마(Apps) 추가. 3: Komorebi·YASB, 확장자 없는 Discord 테마, 앱별 테마 여러 개(Variants).
+    /// 이보다 낮은 매니페스트는 불러올 때 다시 분석한다.
+    /// </summary>
+    public const int CurrentSchemaVersion = 3;
 
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
     public string Id { get; set; } = "";
@@ -27,10 +30,10 @@ public sealed class ThemePackage
     /// <summary>files\ 기준 상대 경로.</summary>
     public List<string> Wallpapers { get; set; } = [];
 
-    /// <summary>Windhawk 밖의 앱 테마 (Windows Terminal, Discord).</summary>
+    /// <summary>Windhawk 밖의 앱 테마 (Windows Terminal, Discord, Komorebi, YASB).</summary>
     public List<ThemeAppConfig> Apps { get; set; } = [];
 
-    /// <summary>이 앱이 적용하지 않는 다른 프로그램용 설정 (Spicetify, Komorebi ...).</summary>
+    /// <summary>이 앱이 적용하지 않는 다른 프로그램용 설정 (Spicetify, Cava ...).</summary>
     public List<string> OtherItems { get; set; } = [];
 
     [JsonIgnore]
