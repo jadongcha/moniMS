@@ -13,6 +13,9 @@ public sealed class AppSettings
     /// <summary>현재 위젯 레이아웃. 프리셋을 적용하면 여기로 복사된다.</summary>
     public WidgetLayout Widget { get; set; } = new();
 
+    /// <summary>현재 사진 위젯. 이미지를 고르기 전에는 ImagePath가 null이라 창이 뜨지 않는다.</summary>
+    public ImageWidgetLayout ImageWidget { get; set; } = new();
+
     public string? LastAppliedPresetId { get; set; }
 
     /// <summary>설정 창 테마.</summary>

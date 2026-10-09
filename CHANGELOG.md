@@ -6,6 +6,20 @@ Write upcoming changes under **[Unreleased]**; `release.ps1` moves them into the
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-09
+
+### Added
+- **Image widget**: show a picture or an animated GIF on your desktop. Choose it in the new **Settings → Image widget** tab.
+  - Turn on **Move & resize** (or **Edit widgets** in the tray menu), then drag it to move it or drag an edge or corner to resize it. The picture keeps its shape.
+  - Change its size, opacity and rounded corners. Phone photos are turned the right way up.
+  - MoniMS keeps its own copy of the picture, so you can move or delete the original.
+  - Animated GIFs pause while a window fully covers them or the PC is locked, so they use no CPU then.
+- Presets can save the image widget too (picture, position and size). The preset preview shows it. Overwriting a preset made with an earlier version adds the image widget to it.
+- **Show image widget** in the tray menu.
+
+### Changed
+- The tray menu's **Edit widget position** is now **Edit widgets (move & resize)** and unlocks both widgets.
+
 ## [0.2.2] - 2026-10-08
 
 ### Added

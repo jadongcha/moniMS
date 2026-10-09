@@ -5,7 +5,11 @@ namespace MoniMS.Core.Presets;
 /// <summary>프리셋 하나 = 바탕화면 상태 스냅샷. 각 항목은 null이면 "저장 안 함"을 의미.</summary>
 public sealed class Preset
 {
-    public const int CurrentSchemaVersion = 1;
+    /// <summary>2: 사진 위젯(ImageWidget) 추가.</summary>
+    public const int CurrentSchemaVersion = 2;
+
+    /// <summary>사진 위젯이 생긴 버전. 이보다 오래된 프리셋은 사진 위젯을 고를 수 없었다.</summary>
+    private const int ImageWidgetSchemaVersion = 2;
 
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
@@ -18,12 +22,25 @@ public sealed class Preset
     public DesktopIconLayout? Icons { get; set; }
     public WidgetLayout? Widget { get; set; }
 
+    /// <summary>사진 위젯. ImagePath는 이 프리셋 폴더 안의 복사본 파일 이름.</summary>
+    public ImageWidgetLayout? ImageWidget { get; set; }
+
     [JsonIgnore]
     public PresetParts AvailableParts =>
         (Wallpaper is null ? 0 : PresetParts.Wallpaper)
         | (Theme is null ? 0 : PresetParts.Theme)
         | (Icons is null ? 0 : PresetParts.Icons)
-        | (Widget is null ? 0 : PresetParts.Widget);
+        | (Widget is null ? 0 : PresetParts.Widget)
+        | (ImageWidget is null ? 0 : PresetParts.ImageWidget);
+
+    /// <summary>
+    /// 덮어쓸 때 다시 저장할 항목: 원래 들어 있던 항목. 사진 위젯이 생기기 전에 만든 프리셋은 사진 위젯도 더한다
+    /// (그때는 고를 수 없었을 뿐 빼기로 한 게 아니므로). 새 프리셋에서 사진 위젯을 뺐다면 계속 뺀다.
+    /// </summary>
+    [JsonIgnore]
+    public PresetParts OverwriteParts =>
+        (AvailableParts == PresetParts.None ? PresetParts.All : AvailableParts)
+        | (SchemaVersion < ImageWidgetSchemaVersion ? PresetParts.ImageWidget : PresetParts.None);
 }
 
 [Flags]
@@ -34,7 +51,8 @@ public enum PresetParts
     Theme = 2,
     Icons = 4,
     Widget = 8,
-    All = Wallpaper | Theme | Icons | Widget,
+    ImageWidget = 16,
+    All = Wallpaper | Theme | Icons | Widget | ImageWidget,
 }
 
 // ---------- 배경화면 ----------

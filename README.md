@@ -1,6 +1,6 @@
 # MoniMS
 
-**A desktop companion for Windows 11:** switchable desktop presets, a live system-info widget, and one-click themes for the taskbar, Start menu, Windows Terminal, Discord, Komorebi and YASB.
+**A desktop companion for Windows 11:** switchable desktop presets, a live system-info widget, a picture/GIF widget, and one-click themes for the taskbar, Start menu, Windows Terminal, Discord, Komorebi and YASB.
 
 [한국어 안내 →](README.ko.md)
 
@@ -27,10 +27,18 @@ A clean widget that sits on your desktop, behind your windows.
 - **Styles:** Dark, Light, Glass.
 - **Customizable:** background opacity (text stays sharp), font (JetBrains Mono built in), graph color, and which sections to show and in what order.
 
+### 🖼 Image widget
+Put a picture or an animated GIF on your desktop, behind your windows.
+
+- **Pick a picture:** in **Settings → Image widget**, press **Choose image…** (PNG, JPG, GIF, BMP, WebP). MoniMS keeps its own copy, so you can move or delete the original. Phone photos are turned the right way up.
+- **Resize by dragging:** turn on **Move & resize** (or **Edit widgets** in the tray menu), then drag the picture to move it or drag an edge or corner to resize it. The picture grows and shrinks with the widget and keeps its shape.
+- **Also adjustable:** size, opacity and rounded corners.
+- **Light on CPU:** like the info widget it is click-through. GIFs pause while a window fully covers them or the PC is locked.
+
 ### 🎨 Presets
 Save your whole desktop look and switch between looks in one click.
 
-- **What a preset saves:** wallpaper (per monitor, copied so it survives deletion), dark/light mode and accent color, desktop icon positions, and the widget layout.
+- **What a preset saves:** wallpaper (per monitor, copied so it survives deletion), dark/light mode and accent color, desktop icon positions, the info widget layout, and the image widget (its picture is copied into the preset too).
 - **Switching:** apply a preset from the tray menu or from **Settings → Presets**. Click a preset to preview it first.
 
 > Icon layouts restore **positions only**. Files or shortcuts you deleted from the desktop are not recreated.

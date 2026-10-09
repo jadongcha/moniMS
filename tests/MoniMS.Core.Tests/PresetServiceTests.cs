@@ -89,7 +89,7 @@ public sealed class PresetServiceTests : IDisposable
         var result = svc.Apply(p);
 
         Assert.Equal(["theme", "wallpaper", "icons", "widget"], _calls);
-        Assert.Equal(PresetParts.All, result.Applied);
+        Assert.Equal(PresetParts.Wallpaper | PresetParts.Theme | PresetParts.Icons | PresetParts.Widget, result.Applied); // 사진 위젯 없음
         Assert.Equal(2, result.Warnings.Count); // 자동 정렬 + 누락 아이콘
     }
 
@@ -111,7 +111,7 @@ public sealed class PresetServiceTests : IDisposable
 
         var result = await svc.ApplyAsync(p);
 
-        Assert.Equal(PresetParts.All, result.Applied);
+        Assert.Equal(PresetParts.Wallpaper | PresetParts.Theme | PresetParts.Icons | PresetParts.Widget, result.Applied); // 사진 위젯 없음
         Assert.StartsWith("theme:STA:", _calls[0], StringComparison.Ordinal);
         Assert.NotEqual($"theme:STA:{caller}", _calls[0]);
         Assert.Equal(["wallpaper", "icons", "widget"], _calls[1..]);

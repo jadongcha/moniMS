@@ -11,17 +11,19 @@ public sealed class TrayIconService : IDisposable
 {
     private readonly PresetService _presets;
     private readonly WidgetController _widget;
+    private readonly ImageWidgetController _imageWidget;
     private readonly ISettingsStore _settings;
     private readonly WindowService _windows;
     private readonly ILogger<TrayIconService> _logger;
     private readonly WinForms.NotifyIcon _icon;
     private readonly WinForms.ContextMenuStrip _menu = new();
 
-    public TrayIconService(PresetService presets, WidgetController widget, ISettingsStore settings,
+    public TrayIconService(PresetService presets, WidgetController widget, ImageWidgetController imageWidget, ISettingsStore settings,
         WindowService windows, ILogger<TrayIconService> logger)
     {
         _presets = presets;
         _widget = widget;
+        _imageWidget = imageWidget;
         _settings = settings;
         _windows = windows;
         _logger = logger;
@@ -124,12 +126,23 @@ public sealed class TrayIconService : IDisposable
         _menu.Items.Add(new WinForms.ToolStripSeparator());
 
         // 위젯
+        var image = _imageWidget.Layout;
         _menu.Items.Add(Toggle("Show widget", layout.Visible, v => _widget.Update(l => l.Visible = v)));
-        _menu.Items.Add(Toggle("Edit widget position", _widget.IsEditMode, v =>
+        var showImage = Toggle("Show image widget", image.HasImage && image.Visible, v => _imageWidget.Update(l => l.Visible = v));
+        showImage.Enabled = image.HasImage; // 사진을 고르기 전에는 설정 창에서
+        _menu.Items.Add(showImage);
+        // 두 위젯을 함께 편집 (사진 위젯은 크기 조절도)
+        _menu.Items.Add(Toggle("Edit widgets (move && resize)", _widget.IsEditMode || _imageWidget.IsEditMode, v =>
         {
             if (v && !layout.Visible)
                 _widget.Update(l => l.Visible = true);
             _widget.SetEditMode(v);
+            if (image.HasImage)
+            {
+                if (v && !image.Visible)
+                    _imageWidget.Update(l => l.Visible = true);
+                _imageWidget.SetEditMode(v);
+            }
         }));
         _menu.Items.Add(new WinForms.ToolStripSeparator());
 

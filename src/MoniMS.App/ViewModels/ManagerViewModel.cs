@@ -32,6 +32,7 @@ public sealed partial class PresetItemViewModel : ObservableObject
             if (Preset.Theme is not null) parts.Add("Theme");
             if (Preset.Icons is not null) parts.Add("Icon layout");
             if (Preset.Widget is not null) parts.Add("Widget");
+            if (Preset.ImageWidget is not null) parts.Add("Image widget");
             return string.Join(" · ", parts);
         }
     }
@@ -73,9 +74,10 @@ public sealed partial class ManagerViewModel : ObservableObject
     private Velopack.UpdateInfo? _pendingUpdate;
 
     public ManagerViewModel(PresetService presets, WidgetController widget, TrayIconService tray, ISettingsStore settings,
-        ShellThemesViewModel shell, UpdateService updates)
+        ShellThemesViewModel shell, UpdateService updates, ImageWidgetViewModel image)
     {
         Shell = shell;
+        Image = image;
         _updates = updates;
         _updateStatus = updates.IsSupported
             ? "Updates are downloaded from GitHub Releases."
@@ -96,6 +98,7 @@ public sealed partial class ManagerViewModel : ObservableObject
     {
         _widget.LayoutChanged -= OnWidgetLayoutChanged;
         Shell.Dispose();
+        Image.Detach();
     }
 
     /// <summary>트레이 메뉴 등 다른 곳에서 바뀐 표시 상태를 체크박스에 반영.</summary>
@@ -111,6 +114,9 @@ public sealed partial class ManagerViewModel : ObservableObject
 
     /// <summary>"Themes" 탭.</summary>
     public ShellThemesViewModel Shell { get; }
+
+    /// <summary>"Image widget" 탭.</summary>
+    public ImageWidgetViewModel Image { get; }
 
     // ================= 프리셋 =================
     public ObservableCollection<PresetItemViewModel> Presets { get; } = [];
@@ -136,11 +142,13 @@ public sealed partial class ManagerViewModel : ObservableObject
     [ObservableProperty] private bool _includeTheme = true;
     [ObservableProperty] private bool _includeIcons = true;
     [ObservableProperty] private bool _includeWidget = true;
+    [ObservableProperty] private bool _includeImageWidget = true;
     [ObservableProperty] private string _status = "";
 
     private PresetParts SelectedParts =>
         (IncludeWallpaper ? PresetParts.Wallpaper : 0) | (IncludeTheme ? PresetParts.Theme : 0)
-        | (IncludeIcons ? PresetParts.Icons : 0) | (IncludeWidget ? PresetParts.Widget : 0);
+        | (IncludeIcons ? PresetParts.Icons : 0) | (IncludeWidget ? PresetParts.Widget : 0)
+        | (IncludeImageWidget ? PresetParts.ImageWidget : 0);
 
     private void ReloadPresets(string? selectId = null)
     {
@@ -198,12 +206,11 @@ public sealed partial class ManagerViewModel : ObservableObject
     private void Overwrite()
     {
         var preset = SelectedPreset!.Preset;
-        // 프리셋에 원래 들어 있던 항목만 덮어쓴다 (저장 폼은 선택 중엔 숨겨져 있으므로)
-        var parts = preset.AvailableParts == PresetParts.None ? PresetParts.All : preset.AvailableParts;
         if (MessageBox.Show($"Overwrite '{preset.Name}' with the current desktop?", "MoniMS",
                 MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
             return;
-        Run(() => _presets.Overwrite(preset, parts));
+        // 프리셋에 원래 들어 있던 항목만 덮어쓴다 (사진 위젯 전에 만든 프리셋은 사진 위젯도 더해서)
+        Run(() => _presets.Overwrite(preset));
         ReloadPresets();
         Status = $"Overwrote '{preset.Name}'";
     }

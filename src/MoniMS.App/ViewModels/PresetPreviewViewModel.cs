@@ -34,6 +34,16 @@ public sealed class PresetPreviewViewModel
     public double WidgetWidth { get; private init; }
     public double WidgetHeight { get; private init; }
     public Brush WidgetBrush { get; private init; } = Brushes.Transparent;
+
+    /// <summary>사진 위젯 (보이지 않거나 저장 안 했으면 null).</summary>
+    public ImageSource? ImagePicture { get; private init; }
+    public bool HasImage => ImagePicture is not null;
+    public double ImageLeft { get; private init; }
+    public double ImageTop { get; private init; }
+    public double ImageWidth { get; private init; }
+    public double ImageHeight { get; private init; }
+    public double ImageCornerRadius { get; private init; }
+    public double ImageOpacity { get; private init; } = 1;
     public Brush? AccentSwatch { get; private init; }
     public string AccentText { get; private init; } = "";
     public IReadOnlyList<PreviewRow> Rows { get; private init; } = [];
@@ -153,6 +163,35 @@ public sealed class PresetPreviewViewModel
             rows.Add(new PreviewRow("Widget", "not saved"));
         }
 
+        // ----- 사진 위젯 -----
+        ImageSource? picture = null;
+        double imgLeft = 0, imgTop = 0, imgWidth = 0, imgHeight = 0, imgRadius = 0;
+        if (preset.ImageWidget is { } p)
+        {
+            if (p.Visible && p.ImagePath is { } file)
+                picture = Imaging.ImageLoader.LoadThumbnail(Path.Combine(presetDirectory, Path.GetFileName(file)), 480);
+            imgWidth = p.Width * dpiScale;
+            imgHeight = p.Height * dpiScale;
+            imgRadius = p.CornerRadius * dpiScale;
+            if (double.IsNaN(p.Left) || double.IsNaN(p.Top))
+            {
+                imgLeft = (width - imgWidth) / 2; // 기본 위치: 가운데
+                imgTop = (height - imgHeight) / 2;
+            }
+            else
+            {
+                imgLeft = p.Left * dpiScale;
+                imgTop = p.Top * dpiScale;
+            }
+            rows.Add(new PreviewRow("Image", p.ImagePath is null ? "none"
+                : !p.Visible ? $"{p.ImageName} · hidden"
+                : $"{p.ImageName} · {p.Width:0}×{p.Height:0}" + (picture is null ? " · image missing" : "")));
+        }
+        else
+        {
+            rows.Add(new PreviewRow("Image", "not saved"));
+        }
+
         rows.Add(new PreviewRow("Saved", preset.UpdatedAt.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)));
 
         return new PresetPreviewViewModel(preset.Name)
@@ -169,6 +208,13 @@ public sealed class PresetPreviewViewModel
             WidgetWidth = ww,
             WidgetHeight = wh,
             WidgetBrush = widgetBrush,
+            ImagePicture = picture,
+            ImageLeft = imgLeft,
+            ImageTop = imgTop,
+            ImageWidth = imgWidth,
+            ImageHeight = imgHeight,
+            ImageCornerRadius = imgRadius,
+            ImageOpacity = preset.ImageWidget?.Opacity ?? 1,
             AccentSwatch = swatch,
             AccentText = accentText,
             Rows = rows,

@@ -31,7 +31,7 @@ public sealed class PresetStoreTests : IDisposable
         Assert.Equal("#E81123", loaded.Theme!.AccentColor);
         Assert.Equal("휴지통", loaded.Icons!.Icons[0].Name);
         Assert.Equal([WidgetSection.Cpu, WidgetSection.Gpu], loaded.Widget!.Sections);
-        Assert.Equal(PresetParts.All, loaded.AvailableParts);
+        Assert.Equal(PresetParts.Wallpaper | PresetParts.Theme | PresetParts.Icons | PresetParts.Widget, loaded.AvailableParts);
     }
 
     [Fact]

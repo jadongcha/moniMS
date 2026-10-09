@@ -151,6 +151,16 @@
                                                                HorizontalAlignment="Center" VerticalAlignment="Center" />
                                                 </Border>
                                             </Canvas>
+                                            <!-- 사진 위젯: 저장된 위치·크기에 실제 사진 -->
+                                            <Canvas Visibility="{Binding HasImage, Converter={StaticResource BoolToVisibility}}">
+                                                <Border Canvas.Left="{Binding ImageLeft}" Canvas.Top="{Binding ImageTop}"
+                                                        Width="{Binding ImageWidth}" Height="{Binding ImageHeight}"
+                                                        CornerRadius="{Binding ImageCornerRadius}" Opacity="{Binding ImageOpacity}">
+                                                    <Border.Background>
+                                                        <ImageBrush ImageSource="{Binding ImagePicture}" Stretch="Fill" />
+                                                    </Border.Background>
+                                                </Border>
+                                            </Canvas>
                                             <!-- 작업표시줄 자리 -->
                                             <Border Height="48" VerticalAlignment="Bottom" Background="#99101216" />
                                         </Grid>
@@ -201,10 +211,11 @@
                             <CheckBox Content="Theme (dark/light · accent color)" IsChecked="{Binding IncludeTheme}" />
                             <CheckBox Content="Desktop icon layout" IsChecked="{Binding IncludeIcons}" />
                             <CheckBox Content="Info widget layout" IsChecked="{Binding IncludeWidget}" />
+                            <CheckBox Content="Image widget (picture · position · size)" IsChecked="{Binding IncludeImageWidget}" />
                             <Button Content="Save as new preset" Style="{StaticResource PrimaryButton}"
                                     Command="{Binding SaveNewCommand}" Margin="0,12,0,0" HorizontalAlignment="Stretch" />
                             <TextBlock Style="{StaticResource Hint}" Margin="0,10,0,0"
-                                       Text="Overwrite keeps the items a preset already has. For icon layouts, turn off desktop right-click → View → 'Auto arrange icons'." />
+                                       Text="Overwrite keeps the items a preset already has (presets made before the image widget get it added). For icon layouts, turn off desktop right-click → View → 'Auto arrange icons'." />
 
                             <!-- 아이콘 배치의 한계 안내: 위치만 저장되고 파일은 저장되지 않음 -->
                             <Border Margin="0,12,0,0" Padding="10,8" CornerRadius="6" BorderThickness="1"
@@ -275,6 +286,80 @@
                                 </ListBox.ItemTemplate>
                             </ListBox>
                         </DockPanel>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+            <!-- ===== 사진 위젯 ===== -->
+            <TabItem Header="Image widget">
+                <Grid DataContext="{Binding Image}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- 왼쪽: 사진 고르기 + 미리보기 -->
+                    <Border Style="{StaticResource Card}">
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Top" Text="Picture" Style="{StaticResource SectionTitle}" />
+                            <StackPanel DockPanel.Dock="Bottom">
+                                <TextBlock Text="{Binding ImageName}" TextTrimming="CharacterEllipsis" Margin="0,8,0,0"
+                                           ToolTip="{Binding ImageName}" />
+                                <TextBlock Text="{Binding Error}" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap" Margin="0,4,0,0"
+                                           Visibility="{Binding Error, Converter={StaticResource NullToVisible}, ConverterParameter=invert}" />
+                                <UniformGrid Columns="2" Margin="0,8,0,0">
+                                    <Button Content="Choose image…" Style="{StaticResource PrimaryButton}" Command="{Binding ChooseImageCommand}"
+                                            Margin="0,0,4,0" Padding="6,6" />
+                                    <Button Content="Remove" Command="{Binding RemoveImageCommand}" Margin="4,0,0,0" Padding="6,6"
+                                            IsEnabled="{Binding HasImage}" />
+                                </UniformGrid>
+                                <TextBlock Style="{StaticResource Hint}" Margin="0,8,0,0"
+                                           Text="PNG, JPG, GIF (animated), BMP, WebP. MoniMS keeps its own copy, so you can move or delete the original." />
+                            </StackPanel>
+                            <Border CornerRadius="6" BorderThickness="1" BorderBrush="{DynamicResource StrokeBrush}"
+                                    Background="{DynamicResource HoverBrush}" MinHeight="160">
+                                <Grid>
+                                    <Image Source="{Binding Thumbnail}" Stretch="Uniform" Margin="8"
+                                           RenderOptions.BitmapScalingMode="HighQuality" />
+                                    <TextBlock Text="No picture yet.&#x0a;Choose a picture or GIF to show it on your desktop."
+                                               Style="{StaticResource Hint}" TextAlignment="Center" TextWrapping="Wrap" Margin="12"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               Visibility="{Binding HasImage, Converter={StaticResource InverseBoolToVisibility}}" />
+                                </Grid>
+                            </Border>
+                        </DockPanel>
+                    </Border>
+
+                    <!-- 오른쪽: 표시 / 크기 / 모양 -->
+                    <Border Grid.Column="2" Style="{StaticResource Card}">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel Margin="0,0,10,0" IsEnabled="{Binding HasImage}">
+                                <TextBlock Text="Display" Style="{StaticResource SectionTitle}" />
+                                <CheckBox Content="Show image widget" IsChecked="{Binding IsShown}" />
+                                <CheckBox Content="Move &amp; resize" IsChecked="{Binding EditMode}" />
+                                <TextBlock Style="{StaticResource Hint}" Margin="0,4,0,0"
+                                           Text="Like the info widget, it is click-through. Turn on Move &amp; resize to drag it around or drag an edge to resize. The picture keeps its shape." />
+
+                                <TextBlock Margin="0,16,0,2" Style="{StaticResource Hint}">
+                                    <Run Text="Size" /> <Run Text="{Binding SizeText, Mode=OneWay}" />
+                                </TextBlock>
+                                <Slider Minimum="48" Maximum="{Binding MaxWidth}" Value="{Binding ImageWidth}" SmallChange="8" LargeChange="64" />
+
+                                <TextBlock Margin="0,12,0,2" Style="{StaticResource Hint}">
+                                    <Run Text="Opacity" /> <Run Text="{Binding ImageOpacity, StringFormat=P0, Mode=OneWay}" />
+                                </TextBlock>
+                                <Slider Minimum="0.1" Maximum="1" Value="{Binding ImageOpacity}" SmallChange="0.05" LargeChange="0.1" />
+
+                                <TextBlock Margin="0,12,0,2" Style="{StaticResource Hint}">
+                                    <Run Text="Rounded corners" /> <Run Text="{Binding CornerRadius, StringFormat={}{0:0}, Mode=OneWay}" />
+                                </TextBlock>
+                                <Slider Minimum="0" Maximum="48" Value="{Binding CornerRadius}" SmallChange="1" LargeChange="4" />
+
+                                <TextBlock Style="{StaticResource Hint}" Margin="0,16,0,0"
+                                           Text="Presets save the image widget too (picture, position, size). Animated GIFs pause while a window covers them or the PC is locked, so they use no CPU then." />
+                            </StackPanel>
+                        </ScrollViewer>
                     </Border>
                 </Grid>
             </TabItem>

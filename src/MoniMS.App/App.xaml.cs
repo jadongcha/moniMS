@@ -68,6 +68,7 @@ public partial class App : Application
         monitor.Start();
 
         _services.GetRequiredService<WidgetController>().Initialize();
+        _services.GetRequiredService<ImageWidgetController>().Initialize();
         _services.GetRequiredService<TrayIconService>().Show();
         ListenForActivation();
         ListenForExit();
@@ -104,6 +105,10 @@ public partial class App : Application
         services.AddSingleton<WidgetViewModel>();
         services.AddSingleton<WidgetController>();
         services.AddSingleton<IWidgetLayoutHost>(sp => sp.GetRequiredService<WidgetController>());
+        services.AddSingleton<ImageStore>(_ => new ImageStore());
+        services.AddSingleton<ImageWidgetController>();
+        services.AddSingleton<IImageWidgetHost>(sp => sp.GetRequiredService<ImageWidgetController>());
+        services.AddTransient<ImageWidgetViewModel>();
         services.AddSingleton<TrayIconService>();
         services.AddSingleton<WindowService>();
         services.AddSingleton<IWindhawkSettingsWriter, ElevatedWindhawkWriter>();
