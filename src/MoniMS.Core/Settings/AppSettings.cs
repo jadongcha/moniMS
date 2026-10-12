@@ -16,6 +16,9 @@ public sealed class AppSettings
     /// <summary>현재 사진 위젯. 이미지를 고르기 전에는 ImagePath가 null이라 창이 뜨지 않는다.</summary>
     public ImageWidgetLayout ImageWidget { get; set; } = new();
 
+    /// <summary>현재 파일 위젯. 폴더를 하나 이상 고르기 전에는 창이 뜨지 않는다.</summary>
+    public FileWidgetLayout FileWidget { get; set; } = new();
+
     public string? LastAppliedPresetId { get; set; }
 
     /// <summary>설정 창 테마.</summary>

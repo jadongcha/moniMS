@@ -9,7 +9,7 @@ namespace MoniMS.App.Interop;
 /// 위젯 창을 "바탕화면에 붙은" 상태로 만든다.
 /// - 소유자(owner)를 Progman(바탕화면)으로 설정 → Win+D(바탕화면 보기)에도 사라지지 않음
 /// - 항상 Z순서 맨 아래(HWND_BOTTOM) 유지 → 다른 창을 가리지 않음
-/// - 작업표시줄/Alt+Tab에 표시 안 함, 포커스를 빼앗지 않음
+/// - 작업표시줄/Alt+Tab에 표시 안 함, 포커스를 빼앗지 않음 (파일 위젯처럼 키보드를 받아야 하는 창은 클릭하면 활성화)
 /// </summary>
 internal static partial class DesktopPinning
 {
@@ -32,6 +32,9 @@ internal static partial class DesktopPinning
 
     /// <summary>창별로 원하는 클릭 통과 상태. WPF가 확장 스타일을 다시 쓰더라도 이 값으로 강제한다.</summary>
     private static readonly Dictionary<IntPtr, bool> ClickThroughState = new();
+
+    /// <summary>클릭하면 활성화되는 창 (WS_EX_NOACTIVATE 없음). 키보드 입력을 받는다.</summary>
+    private static readonly HashSet<IntPtr> Activatable = [];
     private const int WM_WINDOWPOSCHANGING = 0x0046;
     private const uint SWP_NOSIZE = 0x0001;
     private const uint SWP_NOMOVE = 0x0002;
@@ -67,12 +70,17 @@ internal static partial class DesktopPinning
     /// <summary>explorer.exe가 재시작되면 브로드캐스트되는 메시지.</summary>
     public static readonly uint TaskbarCreatedMessage = RegisterWindowMessage("TaskbarCreated");
 
-    public static void Pin(Window window, Action? onExplorerRestart = null)
+    /// <param name="activatable">클릭하면 활성화되어 키보드 입력을 받는다. 그래도 Z순서는 맨 아래에 머문다.</param>
+    public static void Pin(Window window, Action? onExplorerRestart = null, bool activatable = false)
     {
         var hwnd = new WindowInteropHelper(window).EnsureHandle();
+        if (activatable)
+            Activatable.Add(hwnd);
 
         var ex = (long)GetWindowLongPtr(hwnd, GWL_EXSTYLE);
         ex = (ex | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE) & ~WS_EX_APPWINDOW;
+        if (activatable)
+            ex &= ~WS_EX_NOACTIVATE;
         SetWindowLongPtr(hwnd, GWL_EXSTYLE, (IntPtr)ex);
 
         var progman = DesktopWindowFinder.Progman;
@@ -111,6 +119,11 @@ internal static partial class DesktopPinning
             }
             return IntPtr.Zero;
         });
+        window.Closed += (_, _) =>
+        {
+            Activatable.Remove(hwnd);
+            ClickThroughState.Remove(hwnd);
+        };
     }
 
     public static void SendToBottom(IntPtr hwnd) =>
@@ -138,6 +151,8 @@ internal static partial class DesktopPinning
     {
         long s = style;
         s = (s | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_LAYERED) & ~WS_EX_APPWINDOW;
+        if (Activatable.Contains(hwnd))
+            s &= ~WS_EX_NOACTIVATE;
         s = ClickThroughState.TryGetValue(hwnd, out var ct) && ct ? s | WS_EX_TRANSPARENT : s & ~WS_EX_TRANSPARENT;
         return (uint)s;
     }

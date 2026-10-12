@@ -435,4 +435,5 @@
     <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
     <app:NullToVisibleConverter x:Key="NullToVisible" />
     <app:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibility" />
+    <app:InverseBoolConverter x:Key="InverseBool" />
 </ResourceDictionary>

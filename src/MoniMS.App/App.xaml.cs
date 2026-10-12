@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using MoniMS.App.Interop;
 using MoniMS.App.Logging;
 using MoniMS.App.Services;
 using MoniMS.App.ViewModels;
@@ -69,6 +70,7 @@ public partial class App : Application
 
         _services.GetRequiredService<WidgetController>().Initialize();
         _services.GetRequiredService<ImageWidgetController>().Initialize();
+        _services.GetRequiredService<FileWidgetController>().Initialize();
         _services.GetRequiredService<TrayIconService>().Show();
         ListenForActivation();
         ListenForExit();
@@ -109,6 +111,11 @@ public partial class App : Application
         services.AddSingleton<ImageWidgetController>();
         services.AddSingleton<IImageWidgetHost>(sp => sp.GetRequiredService<ImageWidgetController>());
         services.AddTransient<ImageWidgetViewModel>();
+        services.AddSingleton<ShellIcons>();
+        services.AddSingleton<FileWidgetViewModel>();
+        services.AddSingleton<FileWidgetController>();
+        services.AddSingleton<IFileWidgetHost>(sp => sp.GetRequiredService<FileWidgetController>());
+        services.AddTransient<FileWidgetSettingsViewModel>();
         services.AddSingleton<TrayIconService>();
         services.AddSingleton<WindowService>();
         services.AddSingleton<IWindhawkSettingsWriter, ElevatedWindhawkWriter>();

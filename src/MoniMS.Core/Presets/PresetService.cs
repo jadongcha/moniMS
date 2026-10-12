@@ -15,11 +15,12 @@ public sealed class PresetService
     private readonly IDesktopIconService _icons;
     private readonly IWidgetLayoutHost _widget;
     private readonly IImageWidgetHost? _imageWidget;
+    private readonly IFileWidgetHost? _fileWidget;
     private readonly ILogger<PresetService> _logger;
 
     public PresetService(IPresetStore store, IWallpaperService wallpaper, IThemeService theme,
         IDesktopIconService icons, IWidgetLayoutHost widget, ILogger<PresetService>? logger = null,
-        IImageWidgetHost? imageWidget = null)
+        IImageWidgetHost? imageWidget = null, IFileWidgetHost? fileWidget = null)
     {
         _store = store;
         _wallpaper = wallpaper;
@@ -27,6 +28,7 @@ public sealed class PresetService
         _icons = icons;
         _widget = widget;
         _imageWidget = imageWidget;
+        _fileWidget = fileWidget;
         _logger = logger ?? NullLogger<PresetService>.Instance;
     }
 
@@ -46,7 +48,7 @@ public sealed class PresetService
 
     /// <summary>
     /// 기존 프리셋을 현재 상태로 덮어쓴다 (이름/ID 유지). parts가 없으면 <see cref="Preset.OverwriteParts"/>
-    /// (원래 들어 있던 항목 + 예전 프리셋이면 사진 위젯).
+    /// (원래 들어 있던 항목 + 예전 프리셋이면 그 뒤에 생긴 위젯).
     /// </summary>
     public Preset Overwrite(Preset existing, PresetParts? parts = null)
     {
@@ -68,6 +70,8 @@ public sealed class PresetService
             preset.Widget = _widget.GetCurrentLayout().Clone();
         if (parts.HasFlag(PresetParts.ImageWidget) && _imageWidget is not null)
             preset.ImageWidget = TryRun(() => CaptureImageWidget(dir), "Image widget");
+        if (parts.HasFlag(PresetParts.FileWidget) && _fileWidget is not null)
+            preset.FileWidget = _fileWidget.GetCurrentLayout().Clone();
 
         if (parts.HasFlag(PresetParts.Wallpaper) || parts.HasFlag(PresetParts.ImageWidget))
             RemoveUnreferencedImages(dir, preset);
@@ -201,7 +205,20 @@ public sealed class PresetService
         if (parts.HasFlag(PresetParts.ImageWidget) && _imageWidget is not null &&
             Try(() => _imageWidget.ApplyLayout(ResolveImageWidget(preset, warnings)), "Image widget", warnings))
             applied |= PresetParts.ImageWidget;
+        if (parts.HasFlag(PresetParts.FileWidget) && _fileWidget is not null &&
+            Try(() => _fileWidget.ApplyLayout(ResolveFileWidget(preset, warnings)), "File widget", warnings))
+            applied |= PresetParts.FileWidget;
         return applied;
+    }
+
+    /// <summary>없어진 폴더는 목록에 남겨 둔다 (빼 둔 USB 드라이브일 수도 있으므로). 알리기만 한다.</summary>
+    private static FileWidgetLayout ResolveFileWidget(Preset preset, List<string> warnings)
+    {
+        var layout = preset.FileWidget!.Clone();
+        var missing = layout.Folders.Count(f => !Directory.Exists(f));
+        if (missing > 0)
+            warnings.Add($"File widget: {missing} folder(s) from the preset can't be found. They stay in the list in case they come back (for example a USB drive).");
+        return layout;
     }
 
     /// <summary>프리셋의 사진 위젯 → 이미지 파일 이름을 프리셋 폴더 안의 전체 경로로.</summary>

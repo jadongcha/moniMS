@@ -1,6 +1,6 @@
 # MoniMS
 
-**A desktop companion for Windows 11:** switchable desktop presets, a live system-info widget, a picture/GIF widget, and one-click themes for the taskbar, Start menu, Windows Terminal, Discord, Komorebi and YASB.
+**A desktop companion for Windows 11:** switchable desktop presets, a live system-info widget, a picture/GIF widget, a file widget, and one-click themes for the taskbar, Start menu, Windows Terminal, Discord, Komorebi and YASB.
 
 [한국어 안내 →](README.ko.md)
 
@@ -35,10 +35,20 @@ Put a picture or an animated GIF on your desktop, behind your windows.
 - **Also adjustable:** size, opacity and rounded corners.
 - **Light on CPU:** like the info widget it is click-through. GIFs pause while a window fully covers them or the PC is locked.
 
+### 📁 File widget
+A small File Explorer on your desktop, behind your windows.
+
+- **Pick folders:** in **Settings → File widget**, press **Add folder…**. They are listed on the left of the widget. Click one to see what's inside.
+- **Looks like File Explorer's Details view:** each file shows its name and its extension. Click a column header to sort, or drag the line between the headers to resize.
+- **Works like File Explorer:** double-click to open files and folders, use Back and Up (or Backspace, Alt+←/→/↑), drag files in and out, copy/cut/paste (Ctrl+C/X/V), rename (F2), delete to the Recycle Bin (Del) and make a new folder (Ctrl+Shift+N). Right-click for more. **Show more options** (or Shift+right-click) opens the full Windows menu.
+- **Stays up to date:** the list updates by itself when files change. Hidden files follow your File Explorer setting.
+- **Move & resize:** turn on **Move & resize** (or **Edit widgets** in the tray menu), then drag it or drag an edge or corner.
+- **Styles:** Dark, Light, Glass, with adjustable background opacity.
+
 ### 🎨 Presets
 Save your whole desktop look and switch between looks in one click.
 
-- **What a preset saves:** wallpaper (per monitor, copied so it survives deletion), dark/light mode and accent color, desktop icon positions, the info widget layout, and the image widget (its picture is copied into the preset too).
+- **What a preset saves:** wallpaper (per monitor, copied so it survives deletion), dark/light mode and accent color, desktop icon positions, the info widget layout, the image widget (its picture is copied into the preset too), and the file widget (folders, position and size).
 - **Switching:** apply a preset from the tray menu or from **Settings → Presets**. Click a preset to preview it first.
 
 > Icon layouts restore **positions only**. Files or shortcuts you deleted from the desktop are not recreated.

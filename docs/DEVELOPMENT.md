@@ -6,6 +6,7 @@
 
 - **프리셋**: 배경화면(모니터별), 테마색, 바탕화면 아이콘 배치, 정보 위젯 레이아웃을 한 번에 저장하고 전환합니다.
 - **정보 위젯**: 바탕화면에 붙어 있는 시스템 정보 위젯입니다. CPU·메모리·GPU 사용량과 그래프, 디스크, IP·네트워크 속도, Windows 버전, 하드웨어 정보를 보여 줍니다.
+- **파일 위젯**: 바탕화면에 붙어 있는 작은 파일 탐색기입니다 ("자세히" 보기, 이름·확장자 열). 다른 위젯과 달리 클릭과 키보드 입력을 받습니다.
 - UI는 영어, 글꼴은 **JetBrains Mono**를 앱에 내장했습니다 (SIL OFL 1.1). 위젯 글꼴은 설정에서 바꿀 수 있고, 프리셋에도 함께 저장됩니다.
 - **테마**: 인터넷의 테마 패키지(GitHub 링크, .zip, 폴더, .json, .css)를 가져와 작업표시줄·시작 메뉴(Windhawk), Windows Terminal, Discord(Vencord/BetterDiscord 등)에 적용합니다. 적용 전 상태는 자동으로 백업되고 되돌릴 수 있습니다.
 
@@ -40,6 +41,7 @@ MoniMS.sln
 │  ├─ Presets/                프리셋 모델, JSON 저장소, PresetService (캡처/적용)
 │  ├─ Desktop/                배경화면(COM), 테마(레지스트리), 아이콘 배치(ListView), 색상 유틸
 │  ├─ Settings/               앱 설정, 자동 실행 등록
+│  ├─ Files/                  파일 위젯: 폴더 읽기·정렬·이름 규칙, 끌어 놓기/붙여넣기 규칙
 │  ├─ Shell/                  테마: Windhawk 저장소, 테마 가져오기/분석/적용/백업
 │  │  └─ Apps/                Windows Terminal·Discord 테마 적용 (FileJournal로 원래 파일 내용 기록)
 │  └─ Interop/                Win32 P/Invoke, COM 인터페이스
@@ -84,6 +86,7 @@ MoniMS.sln
 | 테마색 | `HKCU\...\Themes\Personalize`, `DWM`, `Explorer\Accent` 레지스트리 값을 쓰고 `WM_SETTINGCHANGE("ImmersiveColorSet")`를 브로드캐스트 |
 | 아이콘 배치 | 바탕화면 `SysListView32`에 `LVM_GETITEMPOSITION`/`LVM_SETITEMPOSITION` 전송. explorer 프로세스에 원격 버퍼를 할당해 사용. 해상도가 바뀌면 비율로 보정 |
 | 위젯 고정 | 창 소유자를 `Progman`으로 지정해 Win+D에도 유지. `WM_WINDOWPOSCHANGING`을 가로채 항상 맨 아래에 둠. explorer가 재시작되면 창을 다시 만듦 |
+| 파일 위젯 | 폴더 내용은 `FileSystemEnumerable`(백그라운드), 변경 감시는 `FileSystemWatcher`. 아이콘은 `SHGetFileInfo`(전용 STA 스레드, 확장자별 캐시). 복사·이동·삭제는 `SHFileOperation`(Windows 진행률·충돌·휴지통 창), "Show more options"는 셸 `IContextMenu`. 키보드를 받도록 이 창만 `WS_EX_NOACTIVATE`를 뺌 |
 | CPU | `Processor Information\% Processor Utility` (작업 관리자와 같은 값) |
 | GPU | `GPU Engine` 성능 카운터를 엔진별로 합산한 뒤 최댓값 (작업 관리자 방식). VRAM은 `GPU Adapter Memory` |
 | OS 이름 | 레지스트리의 ProductName은 Windows 11에서도 "Windows 10"이라서 빌드 번호(22000 이상)로 판단 |

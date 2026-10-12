@@ -6,6 +6,20 @@ Write upcoming changes under **[Unreleased]**; `release.ps1` moves them into the
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-12
+
+### Added
+- **File widget**: a small File Explorer on your desktop. Choose which folders it shows in the new **Settings → File widget** tab, then click one on the left of the widget to see what's inside.
+  - Looks like File Explorer's **Details** view with **Name** and **Extension** columns. Click a column header to sort, or drag the line between the headers to resize.
+  - Use it like File Explorer: double-click to open, go back or up, drag files in and out, copy, cut, paste, rename (F2), delete to the Recycle Bin and make new folders. Right-click for more, or choose **Show more options** for the full Windows menu.
+  - Hidden files follow your File Explorer setting, and the list updates by itself when files change.
+  - Turn on **Move & resize** (or **Edit widgets** in the tray menu) to move it or drag an edge to resize it. Styles: Dark, Light, Glass.
+- Presets can save the file widget too (folders, position and size). Overwriting a preset made with an earlier version adds the file widget to it.
+- **Show file widget** in the tray menu.
+
+### Changed
+- The info widget's **Graph color** is now picked from a color table (12 hues × 6 shades plus grays) instead of typing a `#RRGGBB` code. Tick **Use Windows accent color** to follow the Windows accent color again. Colors you typed before are kept.
+
 ## [0.3.0] - 2026-10-09
 
 ### Added

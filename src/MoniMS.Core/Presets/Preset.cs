@@ -5,11 +5,14 @@ namespace MoniMS.Core.Presets;
 /// <summary>프리셋 하나 = 바탕화면 상태 스냅샷. 각 항목은 null이면 "저장 안 함"을 의미.</summary>
 public sealed class Preset
 {
-    /// <summary>2: 사진 위젯(ImageWidget) 추가.</summary>
-    public const int CurrentSchemaVersion = 2;
+    /// <summary>2: 사진 위젯(ImageWidget) 추가. 3: 파일 위젯(FileWidget) 추가.</summary>
+    public const int CurrentSchemaVersion = 3;
 
     /// <summary>사진 위젯이 생긴 버전. 이보다 오래된 프리셋은 사진 위젯을 고를 수 없었다.</summary>
     private const int ImageWidgetSchemaVersion = 2;
+
+    /// <summary>파일 위젯이 생긴 버전.</summary>
+    private const int FileWidgetSchemaVersion = 3;
 
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
@@ -25,22 +28,27 @@ public sealed class Preset
     /// <summary>사진 위젯. ImagePath는 이 프리셋 폴더 안의 복사본 파일 이름.</summary>
     public ImageWidgetLayout? ImageWidget { get; set; }
 
+    /// <summary>파일 위젯 (폴더 목록 · 위치 · 크기 · 모양).</summary>
+    public FileWidgetLayout? FileWidget { get; set; }
+
     [JsonIgnore]
     public PresetParts AvailableParts =>
         (Wallpaper is null ? 0 : PresetParts.Wallpaper)
         | (Theme is null ? 0 : PresetParts.Theme)
         | (Icons is null ? 0 : PresetParts.Icons)
         | (Widget is null ? 0 : PresetParts.Widget)
-        | (ImageWidget is null ? 0 : PresetParts.ImageWidget);
+        | (ImageWidget is null ? 0 : PresetParts.ImageWidget)
+        | (FileWidget is null ? 0 : PresetParts.FileWidget);
 
     /// <summary>
-    /// 덮어쓸 때 다시 저장할 항목: 원래 들어 있던 항목. 사진 위젯이 생기기 전에 만든 프리셋은 사진 위젯도 더한다
-    /// (그때는 고를 수 없었을 뿐 빼기로 한 게 아니므로). 새 프리셋에서 사진 위젯을 뺐다면 계속 뺀다.
+    /// 덮어쓸 때 다시 저장할 항목: 원래 들어 있던 항목. 사진 위젯·파일 위젯이 생기기 전에 만든 프리셋은 그 위젯도 더한다
+    /// (그때는 고를 수 없었을 뿐 빼기로 한 게 아니므로). 새 프리셋에서 위젯을 뺐다면 계속 뺀다.
     /// </summary>
     [JsonIgnore]
     public PresetParts OverwriteParts =>
         (AvailableParts == PresetParts.None ? PresetParts.All : AvailableParts)
-        | (SchemaVersion < ImageWidgetSchemaVersion ? PresetParts.ImageWidget : PresetParts.None);
+        | (SchemaVersion < ImageWidgetSchemaVersion ? PresetParts.ImageWidget : PresetParts.None)
+        | (SchemaVersion < FileWidgetSchemaVersion ? PresetParts.FileWidget : PresetParts.None);
 }
 
 [Flags]
@@ -52,7 +60,8 @@ public enum PresetParts
     Icons = 4,
     Widget = 8,
     ImageWidget = 16,
-    All = Wallpaper | Theme | Icons | Widget | ImageWidget,
+    FileWidget = 32,
+    All = Wallpaper | Theme | Icons | Widget | ImageWidget | FileWidget,
 }
 
 // ---------- 배경화면 ----------

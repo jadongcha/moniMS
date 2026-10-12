@@ -51,4 +51,29 @@ public class ColorUtilTests
         Assert.InRange(Math.Abs(back.G - c.G), 0, 1);
         Assert.InRange(Math.Abs(back.B - c.B), 0, 1);
     }
+
+    [Fact]
+    public void Picker_palette_is_a_table_of_hues_by_brightness_plus_a_gray_row()
+    {
+        var palette = ColorUtil.BuildPickerPalette();
+        var columns = ColorUtil.PickerColumns;
+
+        Assert.Equal(0, palette.Count % columns);
+        Assert.Equal(palette.Count, palette.Distinct().Count()); // 같은 색 칸이 없다
+
+        // 각 열은 위에서 아래로 어두워진다 (색 줄들)
+        double Lightness(Rgb c) => ColorUtil.ToHsl(c).L;
+        var colorRows = palette.Count / columns - 1;
+        for (var col = 0; col < columns; col++)
+        {
+            for (var row = 1; row < colorRows; row++)
+                Assert.True(Lightness(palette[row * columns + col]) < Lightness(palette[(row - 1) * columns + col]));
+        }
+
+        // 마지막 줄: 흰색 → 검은색 회색
+        var grays = palette.Skip(colorRows * columns).ToList();
+        Assert.Equal(Rgb.Parse("#FFFFFF"), grays[0]);
+        Assert.Equal(Rgb.Parse("#000000"), grays[^1]);
+        Assert.All(grays, g => Assert.True(g.R == g.G && g.G == g.B));
+    }
 }

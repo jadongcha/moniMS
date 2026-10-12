@@ -2,10 +2,12 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Windows;
+using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MoniMS.App.Services;
 using MoniMS.Core;
+using MoniMS.Core.Desktop;
 using MoniMS.Core.Presets;
 using MoniMS.Core.Settings;
 
@@ -33,6 +35,7 @@ public sealed partial class PresetItemViewModel : ObservableObject
             if (Preset.Icons is not null) parts.Add("Icon layout");
             if (Preset.Widget is not null) parts.Add("Widget");
             if (Preset.ImageWidget is not null) parts.Add("Image widget");
+            if (Preset.FileWidget is not null) parts.Add("File widget");
             return string.Join(" · ", parts);
         }
     }
@@ -51,6 +54,9 @@ public sealed partial class SectionToggleViewModel(WidgetSection kind, string di
     [ObservableProperty] private bool _isEnabled = isEnabled;
 }
 
+/// <summary>그래프 색 표의 한 칸.</summary>
+public sealed record ColorSwatch(string Hex, Brush Brush);
+
 public sealed partial class ManagerViewModel : ObservableObject
 {
     private static readonly Dictionary<WidgetSection, string> SectionNames = new()
@@ -68,16 +74,20 @@ public sealed partial class ManagerViewModel : ObservableObject
     private readonly WidgetController _widget;
     private readonly TrayIconService _tray;
     private readonly ISettingsStore _settings;
+    private readonly IThemeService _theme;
     private bool _loadingWidget;
 
     private readonly UpdateService _updates;
     private Velopack.UpdateInfo? _pendingUpdate;
 
     public ManagerViewModel(PresetService presets, WidgetController widget, TrayIconService tray, ISettingsStore settings,
-        ShellThemesViewModel shell, UpdateService updates, ImageWidgetViewModel image)
+        ShellThemesViewModel shell, UpdateService updates, ImageWidgetViewModel image, IThemeService theme,
+        FileWidgetSettingsViewModel files)
     {
         Shell = shell;
         Image = image;
+        Files = files;
+        _theme = theme;
         _updates = updates;
         _updateStatus = updates.IsSupported
             ? "Updates are downloaded from GitHub Releases."
@@ -99,6 +109,7 @@ public sealed partial class ManagerViewModel : ObservableObject
         _widget.LayoutChanged -= OnWidgetLayoutChanged;
         Shell.Dispose();
         Image.Detach();
+        Files.Detach();
     }
 
     /// <summary>트레이 메뉴 등 다른 곳에서 바뀐 표시 상태를 체크박스에 반영.</summary>
@@ -117,6 +128,9 @@ public sealed partial class ManagerViewModel : ObservableObject
 
     /// <summary>"Image widget" 탭.</summary>
     public ImageWidgetViewModel Image { get; }
+
+    /// <summary>"File widget" 탭.</summary>
+    public FileWidgetSettingsViewModel Files { get; }
 
     // ================= 프리셋 =================
     public ObservableCollection<PresetItemViewModel> Presets { get; } = [];
@@ -143,12 +157,13 @@ public sealed partial class ManagerViewModel : ObservableObject
     [ObservableProperty] private bool _includeIcons = true;
     [ObservableProperty] private bool _includeWidget = true;
     [ObservableProperty] private bool _includeImageWidget = true;
+    [ObservableProperty] private bool _includeFileWidget = true;
     [ObservableProperty] private string _status = "";
 
     private PresetParts SelectedParts =>
         (IncludeWallpaper ? PresetParts.Wallpaper : 0) | (IncludeTheme ? PresetParts.Theme : 0)
         | (IncludeIcons ? PresetParts.Icons : 0) | (IncludeWidget ? PresetParts.Widget : 0)
-        | (IncludeImageWidget ? PresetParts.ImageWidget : 0);
+        | (IncludeImageWidget ? PresetParts.ImageWidget : 0) | (IncludeFileWidget ? PresetParts.FileWidget : 0);
 
     private void ReloadPresets(string? selectId = null)
     {
@@ -209,7 +224,7 @@ public sealed partial class ManagerViewModel : ObservableObject
         if (MessageBox.Show($"Overwrite '{preset.Name}' with the current desktop?", "MoniMS",
                 MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
             return;
-        // 프리셋에 원래 들어 있던 항목만 덮어쓴다 (사진 위젯 전에 만든 프리셋은 사진 위젯도 더해서)
+        // 프리셋에 원래 들어 있던 항목만 덮어쓴다 (예전 프리셋은 그 뒤에 생긴 위젯도 더해서)
         Run(() => _presets.Overwrite(preset));
         ReloadPresets();
         Status = $"Overwrote '{preset.Name}'";
@@ -262,7 +277,87 @@ public sealed partial class ManagerViewModel : ObservableObject
     [ObservableProperty] private double _widgetWidth;
     [ObservableProperty] private double _widgetHeight;
     [ObservableProperty] private double _widgetScale;
+    /// <summary>그래프 색 (#RRGGBB). 비어 있으면 Windows 강조색.</summary>
     [ObservableProperty] private string _accentColor = "";
+
+    // ---- 그래프 색 표 ----
+
+    /// <summary>색 고르기 표 (가로 색상 × 세로 밝기 + 회색 줄).</summary>
+    public IReadOnlyList<ColorSwatch> ColorSwatches { get; } = ColorUtil.BuildPickerPalette()
+        .Select(c =>
+        {
+            var brush = new SolidColorBrush(Color.FromRgb(c.R, c.G, c.B));
+            brush.Freeze();
+            return new ColorSwatch(c.ToString(), brush);
+        })
+        .ToList();
+
+    public int ColorColumns => ColorUtil.PickerColumns;
+
+    /// <summary>표에서 고른 칸. 표에 없는 색(예전에 직접 입력한 색)이거나 Windows 강조색이면 null.</summary>
+    [ObservableProperty] private ColorSwatch? _selectedSwatch;
+
+    [ObservableProperty] private bool _useWindowsAccent;
+
+    /// <summary>색 표 팝업이 열려 있는지. 칸을 고르면 닫힌다.</summary>
+    [ObservableProperty] private bool _isColorPickerOpen;
+
+    private bool _syncingColor;
+
+    /// <summary>지금 그래프에 쓰이는 색 (미리보기 칸).</summary>
+    public Brush GraphColorBrush
+    {
+        get
+        {
+            var c = CurrentGraphColor();
+            var brush = new SolidColorBrush(Color.FromRgb(c.R, c.G, c.B));
+            brush.Freeze();
+            return brush;
+        }
+    }
+
+    /// <summary>색 버튼 글자: 표의 색이면 코드, 표에 없는 색이면 Custom, 강조색이면 Windows accent.</summary>
+    public string GraphColorText =>
+        UseWindowsAccent ? "Windows accent"
+        : SelectedSwatch is null ? $"Custom · {CurrentGraphColor()}"
+        : CurrentGraphColor().ToString();
+
+    private Rgb CurrentGraphColor() =>
+        IsValidHex(AccentColor) ? Rgb.Parse(AccentColor.Trim()) : _theme.GetAccentColor();
+
+    partial void OnSelectedSwatchChanged(ColorSwatch? value)
+    {
+        if (_loadingWidget || _syncingColor || value is null)
+            return;
+        SetGraphColor(value.Hex);
+        IsColorPickerOpen = false;
+    }
+
+    partial void OnUseWindowsAccentChanged(bool value)
+    {
+        // 끄면 지금 보이는 강조색에서 시작한다 (표에 같은 색이 있으면 그 칸이 선택됨)
+        if (!_loadingWidget && !_syncingColor)
+            SetGraphColor(value ? "" : _theme.GetAccentColor().ToString());
+    }
+
+    /// <param name="hex">#RRGGBB, 빈 문자열이면 Windows 강조색.</param>
+    private void SetGraphColor(string hex)
+    {
+        AccentColor = hex; // → PushWidget
+        SyncColorSelection();
+    }
+
+    /// <summary>AccentColor에 맞춰 체크박스·표 선택·미리보기를 맞춘다.</summary>
+    private void SyncColorSelection()
+    {
+        _syncingColor = true;
+        UseWindowsAccent = !IsValidHex(AccentColor);
+        SelectedSwatch = UseWindowsAccent ? null
+            : ColorSwatches.FirstOrDefault(s => Rgb.Parse(s.Hex) == Rgb.Parse(AccentColor.Trim()));
+        _syncingColor = false;
+        OnPropertyChanged(nameof(GraphColorBrush));
+        OnPropertyChanged(nameof(GraphColorText));
+    }
 
     private void LoadWidget()
     {
@@ -276,6 +371,7 @@ public sealed partial class ManagerViewModel : ObservableObject
         WidgetHeight = l.Height;
         WidgetScale = l.Scale;
         AccentColor = l.AccentColor ?? "";
+        SyncColorSelection();
         Font = string.IsNullOrWhiteSpace(l.FontFamily) ? BuiltInFont : l.FontFamily;
 
         Sections.Clear();

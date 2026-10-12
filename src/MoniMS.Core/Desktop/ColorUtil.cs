@@ -44,6 +44,31 @@ public static class ColorUtil
         ];
     }
 
+    /// <summary>색 고르기 표의 색상(도): 빨강 → 주황 → 노랑 → 초록 → 청록 → 파랑 → 보라 → 분홍.</summary>
+    private static readonly int[] PickerHues = [0, 25, 45, 60, 90, 140, 170, 195, 215, 240, 275, 315];
+
+    /// <summary>색 고르기 표의 밝기: 위(밝음) → 아래(어두움).</summary>
+    private static readonly double[] PickerLightness = [0.85, 0.72, 0.60, 0.50, 0.40, 0.28];
+
+    /// <summary>색 고르기 표의 열 수.</summary>
+    public static int PickerColumns => PickerHues.Length;
+
+    /// <summary>
+    /// 색 고르기 표 (행 순서). 가로는 색상, 세로는 밝기이고 맨 아래 줄은 흰색 → 검은색 회색 단계.
+    /// </summary>
+    public static IReadOnlyList<Rgb> BuildPickerPalette()
+    {
+        var list = new List<Rgb>(PickerHues.Length * (PickerLightness.Length + 1));
+        foreach (var l in PickerLightness)
+        {
+            foreach (var h in PickerHues)
+                list.Add(FromHsl(h / 360.0, 0.85, l));
+        }
+        for (var i = 0; i < PickerHues.Length; i++)
+            list.Add(FromHsl(0, 0, 1.0 - (double)i / (PickerHues.Length - 1)));
+        return list;
+    }
+
     public static byte[] PaletteToBytes(IReadOnlyList<Rgb> palette)
     {
         var bytes = new byte[palette.Count * 4];

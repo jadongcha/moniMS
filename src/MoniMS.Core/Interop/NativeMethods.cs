@@ -88,6 +88,11 @@ internal static partial class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool GlobalMemoryStatusEx(ref MEMORYSTATUSEX buffer);
 
+    // ---------- shlwapi ----------
+    /// <summary>파일 탐색기의 이름 비교 (숫자는 크기대로: file2 &lt; file10).</summary>
+    [LibraryImport("shlwapi.dll", StringMarshalling = StringMarshalling.Utf16)]
+    internal static partial int StrCmpLogicalW(string psz1, string psz2);
+
     // ---------- 상수 ----------
     internal const uint WM_SETTINGCHANGE = 0x001A;
     internal const uint WM_THEMECHANGED = 0x031A;

@@ -1,0 +1,491 @@
+<Window x:Class="MoniMS.App.Views.FileWidgetWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:MoniMS.App.ViewModels"
+        xmlns:files="clr-namespace:MoniMS.Core.Files;assembly=MoniMS.Core"
+        Title="MoniMS File Widget"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ShowInTaskbar="False" ShowActivated="False" ResizeMode="NoResize" Topmost="False"
+        Width="620" Height="400" MinWidth="320" MinHeight="200"
+        UseLayoutRounding="True" TextOptions.TextFormattingMode="Display"
+        FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="12.5">
+
+    <Window.Resources>
+        <!-- 아래 브러시는 코드에서 스타일(Dark/Light/Glass)에 맞게 교체된다 (FileWidgetWindow.ApplyStyle) -->
+        <SolidColorBrush x:Key="FwBackground" Color="#EB1F2023" />
+        <SolidColorBrush x:Key="FwBorder" Color="#33FFFFFF" />
+        <SolidColorBrush x:Key="FwText" Color="#F3F4F6" />
+        <SolidColorBrush x:Key="FwSubtle" Color="#9AA1AC" />
+        <SolidColorBrush x:Key="FwDivider" Color="#1AFFFFFF" />
+        <SolidColorBrush x:Key="FwHover" Color="#12FFFFFF" />
+        <SolidColorBrush x:Key="FwInput" Color="#12FFFFFF" />
+        <SolidColorBrush x:Key="FwSelected" Color="#4D60A5FA" />
+        <SolidColorBrush x:Key="FwSelectedHover" Color="#6660A5FA" />
+        <SolidColorBrush x:Key="FwAccent" Color="#60A5FA" />
+        <SolidColorBrush x:Key="FwError" Color="#FF99A4" />
+        <SolidColorBrush x:Key="FwMenuBackground" Color="#2B2B2B" />
+        <SolidColorBrush x:Key="FwMenuBorder" Color="#3D3D3D" />
+        <SolidColorBrush x:Key="FwMenuHover" Color="#14FFFFFF" />
+        <!-- 앱 공용 스크롤바 스타일이 쓰는 색. 설정 창 테마 대신 위젯 스타일을 따르게 여기서 덮어쓴다. -->
+        <SolidColorBrush x:Key="StrongStrokeBrush" Color="#50FFFFFF" />
+        <SolidColorBrush x:Key="SubtleTextBrush" Color="#9AA1AC" />
+        <SolidColorBrush x:Key="AccentBrush" Color="#60A5FA" />
+
+        <FontFamily x:Key="FwIconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
+
+        <!-- 도구 모음 아이콘 버튼 (뒤로 / 앞으로 / 위로 / 새로 고침) -->
+        <Style x:Key="FwToolButton" TargetType="Button">
+            <Setter Property="Width" Value="30" />
+            <Setter Property="Height" Value="30" />
+            <Setter Property="Foreground" Value="{DynamicResource FwText}" />
+            <Setter Property="FontFamily" Value="{StaticResource FwIconFont}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="Transparent" CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource FwHover}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource FwInput}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.35" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 평평한 버튼 (주소 표시줄 칸, 열 머리글, 폴더 추가) -->
+        <Style x:Key="FwFlatButton" TargetType="Button">
+            <Setter Property="Foreground" Value="{DynamicResource FwText}" />
+            <Setter Property="Padding" Value="6,0" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="Transparent" CornerRadius="4" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource FwHover}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource FwInput}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 열 경계: 끌어서 확장자 열 너비를 바꾼다 -->
+        <Style x:Key="FwColumnGrip" TargetType="Thumb">
+            <Setter Property="Cursor" Value="SizeWE" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Thumb">
+                        <Border Background="Transparent">
+                            <Border Width="1" Margin="0,6" Background="{DynamicResource FwDivider}" HorizontalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 스크롤바가 내용 위에 겹쳐 뜨는 ScrollViewer (머리글과 줄의 열이 어긋나지 않게) -->
+        <ControlTemplate x:Key="FwScrollViewer" TargetType="ScrollViewer">
+            <Grid Background="{TemplateBinding Background}">
+                <ScrollContentPresenter x:Name="PART_ScrollContentPresenter" Margin="{TemplateBinding Padding}"
+                                        CanContentScroll="{TemplateBinding CanContentScroll}" />
+                <ScrollBar x:Name="PART_VerticalScrollBar" HorizontalAlignment="Right" Width="6" MinWidth="6" Margin="0,2,2,2"
+                           Cursor="Arrow" Maximum="{TemplateBinding ScrollableHeight}" ViewportSize="{TemplateBinding ViewportHeight}"
+                           Value="{TemplateBinding VerticalOffset}" Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}" />
+            </Grid>
+        </ControlTemplate>
+
+        <ControlTemplate x:Key="FwListTemplate" TargetType="ListBox">
+            <ScrollViewer Template="{StaticResource FwScrollViewer}" Focusable="False" Padding="{TemplateBinding Padding}"
+                          CanContentScroll="True" HorizontalScrollBarVisibility="Disabled">
+                <ItemsPresenter />
+            </ScrollViewer>
+        </ControlTemplate>
+
+        <!-- 파일 목록 한 줄: 마우스를 올리면 옅게, 선택하면 강조색, 끌어 놓을 폴더면 테두리 -->
+        <Style x:Key="FwFileItem" TargetType="ListBoxItem">
+            <Setter Property="Foreground" Value="{DynamicResource FwText}" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="AutomationProperties.Name" Value="{Binding Name}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Bd" Margin="4,0" CornerRadius="4" BorderThickness="1"
+                                Background="Transparent" BorderBrush="Transparent">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource FwHover}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource FwSelected}" />
+                            </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsSelected" Value="True" />
+                                    <Condition Property="IsMouseOver" Value="True" />
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource FwSelectedHover}" />
+                            </MultiTrigger>
+                            <DataTrigger Binding="{Binding IsDropTarget}" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource FwSelected}" />
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource FwAccent}" />
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <!-- 숨김 항목은 파일 탐색기처럼 흐리게 -->
+                <DataTrigger Binding="{Binding IsHidden}" Value="True">
+                    <Setter Property="Opacity" Value="0.6" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- 왼쪽 폴더 목록 한 줄: 지금 연 폴더는 왼쪽에 강조색 막대 -->
+        <Style x:Key="FwSidebarItem" TargetType="ListBoxItem">
+            <Setter Property="Foreground" Value="{DynamicResource FwText}" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="ToolTip" Value="{Binding ToolTip}" />
+            <Setter Property="AutomationProperties.Name" Value="{Binding Name}" />
+            <EventSetter Event="PreviewMouseLeftButtonUp" Handler="OnSidebarItemClick" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Grid Margin="4,1">
+                            <Border x:Name="Bd" CornerRadius="4" BorderThickness="1" Background="Transparent" BorderBrush="Transparent">
+                                <ContentPresenter />
+                            </Border>
+                            <Border x:Name="Pill" Width="3" Height="14" CornerRadius="1.5" HorizontalAlignment="Left"
+                                    Background="{DynamicResource FwAccent}" Visibility="Collapsed" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource FwHover}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource FwInput}" />
+                                <Setter TargetName="Pill" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <DataTrigger Binding="{Binding IsDropTarget}" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource FwSelected}" />
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource FwAccent}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Exists}" Value="False">
+                                <Setter Property="Opacity" Value="0.5" />
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 이름 바꾸기 입력 상자 -->
+        <Style x:Key="FwRenameBox" TargetType="TextBox">
+            <Setter Property="Foreground" Value="{DynamicResource FwText}" />
+            <Setter Property="CaretBrush" Value="{DynamicResource FwText}" />
+            <Setter Property="Background" Value="{DynamicResource FwMenuBackground}" />
+            <Setter Property="SelectionBrush" Value="{DynamicResource FwAccent}" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border Background="{TemplateBinding Background}" BorderBrush="{DynamicResource FwAccent}"
+                                BorderThickness="1" CornerRadius="3">
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="3,0" Focusable="False" VerticalAlignment="Center"
+                                          HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ===== 우클릭 메뉴 (코드에서 만든 ContextMenu에 붙인다) ===== -->
+        <Style x:Key="FwContextMenu" TargetType="ContextMenu">
+            <Setter Property="Foreground" Value="{DynamicResource FwText}" />
+            <Setter Property="FontFamily" Value="Segoe UI Variable Text, Segoe UI" />
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="HasDropShadow" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContextMenu">
+                        <Grid Margin="0,0,10,10">
+                            <!-- 그림자: 내용과 따로 그려서 글자가 흐려지지 않게 -->
+                            <Border CornerRadius="8" Background="#59000000" Margin="2,4,-4,-6">
+                                <Border.Effect>
+                                    <BlurEffect Radius="8" />
+                                </Border.Effect>
+                            </Border>
+                            <Border Background="{DynamicResource FwMenuBackground}" BorderBrush="{DynamicResource FwMenuBorder}"
+                                    BorderThickness="1" CornerRadius="8" Padding="4" MinWidth="220">
+                                <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle" />
+                            </Border>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="FwMenuItem" TargetType="MenuItem">
+            <Setter Property="Foreground" Value="{DynamicResource FwText}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Border x:Name="Bd" Background="Transparent" CornerRadius="4" Height="30" Padding="8,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="26" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="14" />
+                                </Grid.ColumnDefinitions>
+                                <ContentPresenter ContentSource="Icon" VerticalAlignment="Center" HorizontalAlignment="Left" />
+                                <TextBlock x:Name="Check" Text="&#xE73E;" FontFamily="{StaticResource FwIconFont}" FontSize="12"
+                                           VerticalAlignment="Center" Visibility="Collapsed" />
+                                <ContentPresenter Grid.Column="1" ContentSource="Header" RecognizesAccessKey="False" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="2" Text="{TemplateBinding InputGestureText}" Foreground="{DynamicResource FwSubtle}"
+                                           Margin="24,0,0,0" VerticalAlignment="Center" />
+                                <TextBlock x:Name="Arrow" Grid.Column="3" Text="&#xE76C;" FontFamily="{StaticResource FwIconFont}" FontSize="9"
+                                           HorizontalAlignment="Right" VerticalAlignment="Center" Visibility="Collapsed" />
+                                <Popup x:Name="PART_Popup" Placement="Right" HorizontalOffset="6" VerticalOffset="-5"
+                                       IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}"
+                                       AllowsTransparency="True" Focusable="False" PopupAnimation="Fade">
+                                    <Border Background="{DynamicResource FwMenuBackground}" BorderBrush="{DynamicResource FwMenuBorder}"
+                                            BorderThickness="1" CornerRadius="8" Padding="4" MinWidth="160" Margin="0,0,8,8">
+                                        <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle" />
+                                    </Border>
+                                </Popup>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource FwMenuHover}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Check" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="Role" Value="SubmenuHeader">
+                                <Setter TargetName="Arrow" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="FwMenuSeparator" TargetType="Separator">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Separator">
+                        <Border Height="1" Margin="-4,4" Background="{DynamicResource FwMenuBorder}" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid x:Name="Root">
+        <Border x:Name="Card" CornerRadius="8" BorderThickness="1"
+                Background="{DynamicResource FwBackground}" BorderBrush="{DynamicResource FwBorder}"
+                TextElement.Foreground="{DynamicResource FwText}">
+            <DockPanel>
+                <!-- 도구 모음: 뒤로 / 앞으로 / 위로 + 주소 + 새로 고침 -->
+                <DockPanel DockPanel.Dock="Top" Margin="6,6,6,4" Height="30">
+                    <Button Style="{StaticResource FwToolButton}" Content="&#xE72B;" Command="{Binding GoBackCommand}"
+                            ToolTip="Back (Alt+Left)" AutomationProperties.Name="Back" />
+                    <Button Style="{StaticResource FwToolButton}" Content="&#xE72A;" Command="{Binding GoForwardCommand}"
+                            ToolTip="Forward (Alt+Right)" AutomationProperties.Name="Forward" />
+                    <Button Style="{StaticResource FwToolButton}" Content="&#xE74A;" Command="{Binding GoUpCommand}"
+                            ToolTip="Up to the parent folder (Alt+Up)" AutomationProperties.Name="Up" />
+                    <Button DockPanel.Dock="Right" Style="{StaticResource FwToolButton}" Content="&#xE72C;" Command="{Binding RefreshCommand}"
+                            ToolTip="Refresh (F5)" AutomationProperties.Name="Refresh" Margin="4,0,0,0" />
+                    <!-- 주소: 칸을 누르면 그 폴더로. 길면 앞쪽이 잘리고 지금 폴더 쪽이 보인다. -->
+                    <Border CornerRadius="4" Background="{DynamicResource FwInput}" Margin="6,0,0,0" ClipToBounds="True"
+                            ToolTip="{Binding CurrentPath}">
+                        <ScrollViewer x:Name="CrumbScroller" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"
+                                      Focusable="False" Margin="2,0">
+                            <ItemsControl ItemsSource="{Binding Breadcrumbs}" Focusable="False" VerticalAlignment="Center">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type vm:BreadcrumbViewModel}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock x:Name="Sep" Text="&#xE76C;" FontFamily="{StaticResource FwIconFont}" FontSize="8"
+                                                       Foreground="{DynamicResource FwSubtle}" VerticalAlignment="Center" Margin="2,1,2,0" />
+                                            <Button Style="{StaticResource FwFlatButton}" Content="{Binding Name}" Height="24"
+                                                    Click="OnCrumbClick" AutomationProperties.Name="{Binding Name}" />
+                                        </StackPanel>
+                                        <DataTemplate.Triggers>
+                                            <DataTrigger Binding="{Binding IsFirst}" Value="True">
+                                                <Setter TargetName="Sep" Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </DataTemplate.Triggers>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Border>
+                </DockPanel>
+
+                <!-- 상태 표시줄: 항목 수 · 선택 수 · 방금 실패한 동작 -->
+                <Grid DockPanel.Dock="Bottom" Height="24" Margin="12,0,12,2">
+                    <TextBlock Text="{Binding StatusText}" Foreground="{DynamicResource FwSubtle}" FontSize="11.5" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding Error}" Foreground="{DynamicResource FwError}" FontSize="11.5" VerticalAlignment="Center"
+                               HorizontalAlignment="Right" TextTrimming="CharacterEllipsis" MaxWidth="400" ToolTip="{Binding Error}" />
+                </Grid>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <!-- 왼쪽 목록은 위젯 너비를 따라가되 너무 좁거나 넓어지지 않게 -->
+                        <ColumnDefinition Width="3*" MinWidth="96" MaxWidth="170" />
+                        <ColumnDefinition Width="1" />
+                        <ColumnDefinition Width="7*" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- 왼쪽: 고른 폴더들 -->
+                    <DockPanel>
+                        <Button DockPanel.Dock="Bottom" Style="{StaticResource FwFlatButton}" Height="28" Margin="4,2,4,4" Padding="10,0"
+                                Click="OnAddFolderClick" ToolTip="Add a folder to this list" AutomationProperties.Name="Add folder">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE710;" FontFamily="{StaticResource FwIconFont}" FontSize="11" VerticalAlignment="Center"
+                                           Foreground="{DynamicResource FwSubtle}" />
+                                <TextBlock Text="Add folder" Margin="10,0,0,0" Foreground="{DynamicResource FwSubtle}" VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </Button>
+                        <ListBox x:Name="SidebarList" ItemsSource="{Binding Folders}" SelectedItem="{Binding CurrentRoot, Mode=OneWay}"
+                                 ItemContainerStyle="{StaticResource FwSidebarItem}" Template="{StaticResource FwListTemplate}"
+                                 Padding="0,2" AllowDrop="True" AutomationProperties.Name="Folders"
+                                 SelectionChanged="OnSidebarSelectionChanged" ContextMenuOpening="OnSidebarContextMenuOpening"
+                                 DragOver="OnDragOver" DragLeave="OnDragLeave" Drop="OnDrop">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate DataType="{x:Type vm:SidebarFolderViewModel}">
+                                    <Grid Height="28">
+                                        <Image Source="{Binding Icon}" Width="16" Height="16" HorizontalAlignment="Left" Margin="10,0,0,0"
+                                               RenderOptions.BitmapScalingMode="HighQuality" />
+                                        <TextBlock Text="{Binding Name}" Margin="34,0,6,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </DockPanel>
+
+                    <Border Grid.Column="1" Background="{DynamicResource FwDivider}" />
+
+                    <!-- 오른쪽: 자세히 보기 (이름 · 확장자) -->
+                    <Grid Grid.Column="2">
+                        <DockPanel>
+                            <Grid DockPanel.Dock="Top" Height="28" Margin="4,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="{Binding ExtensionColumn}" />
+                                </Grid.ColumnDefinitions>
+                                <Button Style="{StaticResource FwFlatButton}" Padding="8,0" HorizontalContentAlignment="Stretch"
+                                        Command="{Binding SortCommand}" CommandParameter="{x:Static files:FileSortColumn.Name}"
+                                        ToolTip="Sort by name" AutomationProperties.Name="Name">
+                                    <DockPanel>
+                                        <TextBlock DockPanel.Dock="Right" Text="{Binding NameSortGlyph}" FontFamily="{StaticResource FwIconFont}"
+                                                   FontSize="8" Foreground="{DynamicResource FwSubtle}" VerticalAlignment="Center" Margin="4,1,4,0" />
+                                        <TextBlock Text="Name" Foreground="{DynamicResource FwSubtle}" VerticalAlignment="Center" />
+                                    </DockPanel>
+                                </Button>
+                                <Button Grid.Column="1" Style="{StaticResource FwFlatButton}" Padding="8,0" Margin="0,0,10,0"
+                                        HorizontalContentAlignment="Stretch"
+                                        Command="{Binding SortCommand}" CommandParameter="{x:Static files:FileSortColumn.Extension}"
+                                        ToolTip="Sort by extension" AutomationProperties.Name="Extension">
+                                    <DockPanel>
+                                        <TextBlock DockPanel.Dock="Right" Text="{Binding ExtensionSortGlyph}" FontFamily="{StaticResource FwIconFont}"
+                                                   FontSize="8" Foreground="{DynamicResource FwSubtle}" VerticalAlignment="Center" Margin="4,1,0,0" />
+                                        <TextBlock Text="Extension" Foreground="{DynamicResource FwSubtle}" VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </DockPanel>
+                                </Button>
+                                <Thumb Grid.Column="1" Style="{StaticResource FwColumnGrip}" Width="9" Margin="-5,0,0,0" HorizontalAlignment="Left"
+                                       DragDelta="OnColumnGripDrag" DragCompleted="OnColumnGripDone" ToolTip="Drag to resize" />
+                            </Grid>
+
+                            <ListBox x:Name="FileList" ItemsSource="{Binding Items}" SelectionMode="Extended" SizeChanged="OnFileListSizeChanged"
+                                     ItemContainerStyle="{StaticResource FwFileItem}" Template="{StaticResource FwListTemplate}"
+                                     Background="Transparent" Padding="0,0,0,4" FocusVisualStyle="{x:Null}"
+                                     VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
+                                     VirtualizingPanel.ScrollUnit="Pixel"
+                                     IsTextSearchEnabled="True" TextSearch.TextPath="Name"
+                                     AllowDrop="True" AutomationProperties.Name="Files"
+                                     SelectionChanged="OnFileSelectionChanged"
+                                     PreviewMouseLeftButtonDown="OnFilePreviewMouseDown" PreviewMouseMove="OnFilePreviewMouseMove"
+                                     PreviewMouseLeftButtonUp="OnFilePreviewMouseUp" MouseLeftButtonDown="OnFileListBackgroundDown"
+                                     ContextMenuOpening="OnFileContextMenuOpening"
+                                     DragOver="OnDragOver" DragLeave="OnDragLeave" Drop="OnDrop">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type vm:FileItemViewModel}">
+                                        <Grid Height="26">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="{Binding DataContext.ExtensionColumn, RelativeSource={RelativeSource AncestorType=ListBox}}" />
+                                            </Grid.ColumnDefinitions>
+                                            <Image Source="{Binding Icon}" Width="16" Height="16" HorizontalAlignment="Left" Margin="8,0,0,0"
+                                                   RenderOptions.BitmapScalingMode="HighQuality" />
+                                            <TextBlock Text="{Binding DisplayName}" Margin="32,0,8,0" VerticalAlignment="Center"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Extension}" Margin="8,0,14,0" VerticalAlignment="Center"
+                                                       TextTrimming="CharacterEllipsis" Foreground="{DynamicResource FwSubtle}" />
+                                            <!-- 이름 바꾸기: 확장자까지 포함한 전체 이름을 고친다 (파일 탐색기처럼 이름 부분만 선택된 채로 시작) -->
+                                            <TextBox Grid.ColumnSpan="2" Style="{StaticResource FwRenameBox}" Margin="28,1,12,1"
+                                                     Visibility="{Binding IsRenaming, Converter={StaticResource BoolToVisibility}}"
+                                                     AutomationProperties.Name="New name"
+                                                     IsVisibleChanged="OnRenameBoxVisibleChanged" PreviewKeyDown="OnRenameKeyDown"
+                                                     LostKeyboardFocus="OnRenameLostFocus" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </DockPanel>
+                        <!-- 빈 폴더 / 열 수 없는 폴더 안내 -->
+                        <TextBlock Text="{Binding Message}" Foreground="{DynamicResource FwSubtle}" TextWrapping="Wrap" TextAlignment="Center"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24" IsHitTestVisible="False"
+                                   Visibility="{Binding Message, Converter={StaticResource NullToVisible}, ConverterParameter=invert}" />
+                    </Grid>
+                </Grid>
+            </DockPanel>
+        </Border>
+
+        <!-- 편집 모드: 안을 끌면 이동, 가장자리를 끌면 크기 조절. 그동안 파일은 누를 수 없다. -->
+        <Grid x:Name="EditOverlay" Visibility="Collapsed" Background="#33000000">
+            <Border CornerRadius="8" BorderThickness="2" BorderBrush="{DynamicResource FwAccent}" />
+            <Border VerticalAlignment="Top" HorizontalAlignment="Center" Margin="8,8,8,0" Background="{DynamicResource FwAccent}"
+                    CornerRadius="8" Padding="8,2">
+                <TextBlock Text="Drag to move · drag edges to resize" FontSize="11" Foreground="White" TextTrimming="CharacterEllipsis" />
+            </Border>
+            <Path Data="M 14,0 L 14,14 L 0,14 Z" Fill="{DynamicResource FwAccent}"
+                  HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,4,4" />
+        </Grid>
+    </Grid>
+</Window>

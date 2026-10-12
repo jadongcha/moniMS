@@ -44,6 +44,14 @@ public sealed class PresetPreviewViewModel
     public double ImageHeight { get; private init; }
     public double ImageCornerRadius { get; private init; }
     public double ImageOpacity { get; private init; } = 1;
+
+    /// <summary>파일 위젯 (보이지 않거나 저장 안 했으면 HasFiles = false).</summary>
+    public bool HasFiles { get; private init; }
+    public double FilesLeft { get; private init; }
+    public double FilesTop { get; private init; }
+    public double FilesWidth { get; private init; }
+    public double FilesHeight { get; private init; }
+    public Brush FilesBrush { get; private init; } = Brushes.Transparent;
     public Brush? AccentSwatch { get; private init; }
     public string AccentText { get; private init; } = "";
     public IReadOnlyList<PreviewRow> Rows { get; private init; } = [];
@@ -192,6 +200,43 @@ public sealed class PresetPreviewViewModel
             rows.Add(new PreviewRow("Image", "not saved"));
         }
 
+        // ----- 파일 위젯 -----
+        var hasFiles = false;
+        double filesLeft = 0, filesTop = 0, filesWidth = 0, filesHeight = 0;
+        Brush filesBrush = Brushes.Transparent;
+        if (preset.FileWidget is { } f)
+        {
+            hasFiles = f.Visible && f.HasFolders;
+            filesWidth = f.Width * dpiScale;
+            filesHeight = f.Height * dpiScale;
+            if (double.IsNaN(f.Left) || double.IsNaN(f.Top))
+            {
+                filesLeft = (width - filesWidth) * 0.3; // 기본 위치: 가운데보다 조금 왼쪽 위
+                filesTop = (height - filesHeight) * 0.3;
+            }
+            else
+            {
+                filesLeft = f.Left * dpiScale;
+                filesTop = f.Top * dpiScale;
+            }
+            var (baseColor, baseAlpha) = f.Style switch
+            {
+                WidgetStyle.Light => (Color.FromRgb(0xF9, 0xFA, 0xFB), 1.0),
+                WidgetStyle.Glass => (Color.FromRgb(0, 0, 0), 0.4),
+                _ => (Color.FromRgb(0x1F, 0x20, 0x23), 1.0),
+            };
+            var alpha = Math.Max(0.25, baseAlpha * f.Opacity);
+            filesBrush = Frozen(new SolidColorBrush(Color.FromArgb((byte)(alpha * 255), baseColor.R, baseColor.G, baseColor.B)));
+            var names = string.Join(", ", f.Folders.Select(folder => Path.GetFileName(Path.TrimEndingDirectorySeparator(folder)) is { Length: > 0 } n ? n : folder));
+            rows.Add(new PreviewRow("Files", !f.HasFolders ? "no folders"
+                : !f.Visible ? $"{names} · hidden"
+                : $"{names} · {f.Width:0}×{f.Height:0}"));
+        }
+        else
+        {
+            rows.Add(new PreviewRow("Files", "not saved"));
+        }
+
         rows.Add(new PreviewRow("Saved", preset.UpdatedAt.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)));
 
         return new PresetPreviewViewModel(preset.Name)
@@ -215,6 +260,12 @@ public sealed class PresetPreviewViewModel
             ImageHeight = imgHeight,
             ImageCornerRadius = imgRadius,
             ImageOpacity = preset.ImageWidget?.Opacity ?? 1,
+            HasFiles = hasFiles,
+            FilesLeft = filesLeft,
+            FilesTop = filesTop,
+            FilesWidth = filesWidth,
+            FilesHeight = filesHeight,
+            FilesBrush = filesBrush,
             AccentSwatch = swatch,
             AccentText = accentText,
             Rows = rows,
