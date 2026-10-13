@@ -6,6 +6,11 @@ Write upcoming changes under **[Unreleased]**; `release.ps1` moves them into the
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-10-13
+
+### Changes
+- Maintenance update
+
 ## [0.4.1] - 2026-10-13
 
 ### Changed
