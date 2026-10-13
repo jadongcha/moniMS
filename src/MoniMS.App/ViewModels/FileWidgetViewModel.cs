@@ -55,53 +55,55 @@ public sealed partial class FileItemViewModel : ObservableObject
     /// <summary>파일을 끌어 이 폴더 위에 올려 둔 상태.</summary>
     [ObservableProperty] private bool _isDropTarget;
 
-    /// <summary>다시 읽었을 때 속성(숨김 등)만 바뀐 경우.</summary>
+    /// <summary>다시 읽었을 때 같은 항목인데 속성(숨김 등)이나 이름의 대소문자만 바뀐 경우 (a.txt → A.txt).</summary>
     internal void Update(FileEntry entry)
     {
-        if (entry.Attributes == Entry.Attributes)
+        if (entry.Attributes == Entry.Attributes && string.Equals(entry.FullPath, Entry.FullPath, StringComparison.Ordinal))
             return;
         Entry = entry;
-        OnPropertyChanged(nameof(IsHidden));
+        OnPropertyChanged(string.Empty); // 모든 표시 값
     }
 }
 
-/// <summary>왼쪽 목록의 폴더 (사용자가 고른 폴더).</summary>
+/// <summary>
+/// 왼쪽 목록의 폴더 (사용자가 고른 폴더). 있는지와 표시 이름(문서, 바탕 화면 …)은 백그라운드에서 알아낸다.
+/// 연결이 끊긴 네트워크 폴더는 확인에 수십 초가 걸려서 UI 스레드에서 하면 앱 전체가 멈춘다.
+/// </summary>
 public sealed partial class SidebarFolderViewModel : ObservableObject
 {
     private readonly ShellIcons _icons;
     private ImageSource? _icon;
     private bool _iconRequested;
+    private bool _checked;
+    private FileAttributes _attributes = FileAttributes.Directory;
 
     public SidebarFolderViewModel(string path, ShellIcons icons)
     {
         Path = path;
         _icons = icons;
-        Exists = Directory.Exists(path);
-        Name = Exists ? ShellIcons.GetDisplayName(path) : System.IO.Path.GetFileName(System.IO.Path.TrimEndingDirectorySeparator(path)) is { Length: > 0 } n ? n : path;
+        _name = ShellIcons.FolderName(path);
+        _ = CheckAsync();
     }
 
     public string Path { get; }
-    public string Name { get; }
-    public bool Exists { get; }
+
+    [ObservableProperty] private string _name;
+
+    /// <summary>확인하기 전에는 있다고 본다 (흐리게 보였다가 돌아오지 않도록).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ToolTip))]
+    private bool _exists = true;
+
     public string ToolTip => Exists ? Path : Path + "\n(not available)";
 
     public ImageSource? Icon
     {
         get
         {
-            if (!_iconRequested && Exists)
+            if (!_iconRequested && _checked && Exists)
             {
                 _iconRequested = true;
-                FileAttributes attributes;
-                try
-                {
-                    attributes = File.GetAttributes(Path);
-                }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                {
-                    attributes = FileAttributes.Directory;
-                }
-                _icon = _icons.Get(Path, true, attributes, icon =>
+                _icon = _icons.Get(Path, true, _attributes, icon =>
                 {
                     _icon = icon;
                     OnPropertyChanged(nameof(Icon));
@@ -112,6 +114,28 @@ public sealed partial class SidebarFolderViewModel : ObservableObject
     }
 
     [ObservableProperty] private bool _isDropTarget;
+
+    private async Task CheckAsync()
+    {
+        var attributes = await Task.Run(() =>
+        {
+            try
+            {
+                return (FileAttributes?)File.GetAttributes(Path);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+            {
+                return null;
+            }
+        });
+        _checked = true;
+        Exists = attributes is { } a && (a & FileAttributes.Directory) != 0;
+        if (!Exists)
+            return;
+        _attributes = attributes!.Value;
+        OnPropertyChanged(nameof(Icon)); // 이제 아이콘을 읽는다
+        Name = await _icons.GetDisplayNameAsync(Path);
+    }
 }
 
 /// <summary>주소 표시줄의 한 칸.</summary>
@@ -258,14 +282,16 @@ public sealed partial class FileWidgetViewModel : ObservableObject, IDisposable
             foreach (var folder in folders)
                 Folders.Add(new SidebarFolderViewModel(folder, _icons));
         }
-        var first = folders.FirstOrDefault(Directory.Exists) ?? (folders.Count > 0 ? folders[0] : null);
+        // UI 스레드라서 네트워크 폴더는 있는지 묻지 않는다 (없으면 목록 자리에 안내가 뜬다)
+        var first = folders.FirstOrDefault(FolderReader.ProbablyExists) ?? (folders.Count > 0 ? folders[0] : null);
         // 목록 밖(위로 가기로 올라간 곳)을 보고 있었으면 폴더를 더하거나 빼도 그대로 둔다
         var rootRemoved = oldRoot is not null && !folders.Any(f => FileTransferRules.PathsEqual(f, oldRoot));
+        var preferredExists = preferred is not null && FolderReader.ProbablyExists(preferred);
 
-        if (preferred is not null && !FileTransferRules.PathsEqual(preferred, CurrentPath) && Directory.Exists(preferred))
+        if (preferredExists && !FileTransferRules.PathsEqual(preferred, CurrentPath))
             Navigate(preferred);
         else if (CurrentPath is null)
-            Navigate(preferred is not null && Directory.Exists(preferred) ? preferred : first);
+            Navigate(preferredExists ? preferred : first);
         else if (rootRemoved && FindRoot(CurrentPath) is null)
             Navigate(first);
         else if (changed)
@@ -278,9 +304,10 @@ public sealed partial class FileWidgetViewModel : ObservableObject, IDisposable
         if (_active == active)
             return;
         _active = active;
-        Watch(active ? CurrentPath : null);
-        if (active && CurrentPath is { } path)
-            _ = LoadAsync(path, [], rename: false); // 숨겨진 동안 바뀐 것 반영
+        if (!active)
+            Watch(null);
+        else if (CurrentPath is { } path)
+            _ = LoadAsync(path, [], rename: false); // 숨겨진 동안 바뀐 것 반영 (읽은 뒤 감시 시작)
     }
 
     /// <summary>설정에 저장된 정렬·열 너비 (다시 읽지 않아도 되면 그대로).</summary>
@@ -301,7 +328,15 @@ public sealed partial class FileWidgetViewModel : ObservableObject, IDisposable
     {
         if (path is null)
             return;
-        path = FileTransferRules.Normalize(path);
+        try
+        {
+            path = FileTransferRules.Normalize(path);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            ShowError($"'{path}' is not a valid folder path."); // 직접 고친 설정 파일·프리셋 등
+            return;
+        }
         if (CurrentPath is not null && !FileTransferRules.PathsEqual(CurrentPath, path))
         {
             _back.Push(CurrentPath);
@@ -314,7 +349,7 @@ public sealed partial class FileWidgetViewModel : ObservableObject, IDisposable
     {
         CurrentPath = path;
         UpdateLocation();
-        Watch(_active ? path : null);
+        Watch(null); // 새 폴더는 읽고 나서 감시 (없는 폴더·끊긴 네트워크 폴더에 UI 스레드가 매달리지 않게)
         Error = null;
         GoBackCommand.NotifyCanExecuteChanged();
         GoForwardCommand.NotifyCanExecuteChanged();
@@ -435,7 +470,7 @@ public sealed partial class FileWidgetViewModel : ObservableObject, IDisposable
         {
             message = "This folder can't be found. It may have been moved, renamed or deleted, or it's on a drive that isn't connected.";
         }
-        catch (IOException ex)
+        catch (Exception ex) when (ex is IOException or ArgumentException or NotSupportedException or System.Security.SecurityException)
         {
             message = ex.Message;
         }
@@ -448,7 +483,7 @@ public sealed partial class FileWidgetViewModel : ObservableObject, IDisposable
             Items = [];
             Message = message;
         }
-        else if (sameFolder && _loadedSort == sort)
+        else if (sameFolder && _loadedSort == sort && Items.Count > 0)
         {
             Sync(entries);
             Message = entries.Count == 0 ? "This folder is empty." : null;
@@ -463,6 +498,9 @@ public sealed partial class FileWidgetViewModel : ObservableObject, IDisposable
         }
         _loadedPath = path;
         _loadedSort = sort;
+        // 읽을 수 있는 폴더만 감시한다. 이미 감시 중이면 그대로 (다시 읽을 때마다 새로 만들지 않게).
+        if (entries is not null && _active && !FileTransferRules.PathsEqual(_watcher?.Path, path))
+            Watch(path);
         OnPropertyChanged(nameof(StatusText));
         ItemsLoaded?.Invoke(this, new ItemsLoadedEventArgs(select, rename, sameFolder));
     }
@@ -564,8 +602,8 @@ public sealed partial class FileWidgetViewModel : ObservableObject, IDisposable
             _watcher.Dispose();
             _watcher = null;
         }
-        if (path is null || !Directory.Exists(path))
-            return;
+        if (path is null)
+            return; // 감시는 폴더를 읽은 뒤에만 시작하므로 여기서 다시 있는지 묻지 않는다
         try
         {
             var watcher = new FileSystemWatcher(path)

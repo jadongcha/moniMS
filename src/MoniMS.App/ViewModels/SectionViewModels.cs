@@ -34,6 +34,9 @@ public abstract class SectionViewModel : ObservableObject
 
     private static string GpuDetail(SystemSnapshot s, StaticSystemInfo info)
     {
+        // 내장 GPU: 작업 관리자의 "공유 GPU 메모리"처럼 시스템 메모리의 절반까지 쓸 수 있다
+        if (s.GpuMemoryShared && s.GpuMemoryUsedBytes is { } shared)
+            return $"Shared memory {Format.Bytes(shared)} / {Format.Bytes(info.TotalMemoryBytes / 2)}";
         var total = info.Gpus.Select(g => g.DedicatedMemoryBytes).DefaultIfEmpty(0UL).Max();
         if (s.GpuMemoryUsedBytes is { } used && total > 0)
             return $"VRAM {Format.Bytes(used)} / {Format.Bytes(total)}";

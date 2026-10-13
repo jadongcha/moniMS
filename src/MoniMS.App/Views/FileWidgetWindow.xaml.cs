@@ -60,6 +60,7 @@ public partial class FileWidgetWindow : Window
 
     private object? _dropHighlight;
     private bool _renameBusy;
+    private (WidgetStyle, Color, double)? _appliedStyle;
 
     public FileWidgetWindow(FileWidgetViewModel vm, FileWidgetController controller)
     {
@@ -91,6 +92,10 @@ public partial class FileWidgetWindow : Window
     /// <param name="backgroundOpacity">배경만의 불투명도. 글자·아이콘은 그대로.</param>
     public void ApplyStyle(WidgetStyle style, Color accent, double backgroundOpacity)
     {
+        // Windows 설정 변경 알림은 자주 오는데 대부분 위젯과 상관없다. 같으면 다시 그리지 않는다.
+        if (_appliedStyle == (style, accent, backgroundOpacity))
+            return;
+        _appliedStyle = (style, accent, backgroundOpacity);
         var light = style == WidgetStyle.Light;
         // 배경/테두리는 "불투명도 100%일 때"의 색. 유리 스타일은 100%여도 반투명.
         var (bg, border, text, subtle, divider, hover, input) = style switch

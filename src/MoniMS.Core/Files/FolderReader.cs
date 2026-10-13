@@ -73,6 +73,28 @@ public static class FolderReader
         return [.. entries];
     }
 
+    /// <summary>
+    /// 폴더가 있는지 바로 알 수 있으면 확인하고, 네트워크 폴더는 있다고 본다.
+    /// 연결이 끊긴 네트워크 공유는 확인에 수십 초가 걸려서 UI 스레드에서 물으면 앱이 멈춘다.
+    /// </summary>
+    public static bool ProbablyExists(string folder) => IsNetworkPath(folder) || Directory.Exists(folder);
+
+    /// <summary>\\서버\공유 경로이거나 네트워크 드라이브(Z: 등)에 있는지. 네트워크에 접속하지 않고 판단한다.</summary>
+    public static bool IsNetworkPath(string path)
+    {
+        if (path.StartsWith(@"\\", StringComparison.Ordinal))
+            return true;
+        try
+        {
+            var root = Path.GetPathRoot(path);
+            return !string.IsNullOrEmpty(root) && new DriveInfo(root).DriveType == DriveType.Network;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
     /// <summary>숨김 항목은 "숨김 항목 표시"를 켰을 때만, 숨김+시스템(보호된 OS 파일)은 그것까지 켰을 때만.</summary>
     public static bool IsShown(FileAttributes attributes, bool showHidden, bool showProtected)
     {

@@ -68,6 +68,22 @@ public sealed class FileWidgetTests : IDisposable
         Assert.True(FolderReader.List(_root, true, false).Single(e => e.Name == "secret.txt").IsHidden);
     }
 
+    [Theory]
+    [InlineData(@"\\nas\share\photos", true)]
+    [InlineData(@"\\?\C:\long\path", true)]
+    [InlineData(@"C:\Windows", false)]
+    [InlineData(@"relative\path", false)]
+    public void Recognizes_network_paths_without_touching_the_network(string path, bool expected) =>
+        Assert.Equal(expected, FolderReader.IsNetworkPath(path));
+
+    [Fact]
+    public void Local_folders_are_checked_and_network_folders_are_assumed_to_exist()
+    {
+        Assert.True(FolderReader.ProbablyExists(_root));
+        Assert.False(FolderReader.ProbablyExists(Path.Combine(_root, "nope")));
+        Assert.True(FolderReader.ProbablyExists(@"\\moniMS-test-host-that-does-not-exist\share")); // 묻지 않으므로 바로 끝난다
+    }
+
     [Fact]
     public void Missing_folder_throws_so_the_widget_can_say_why()
     {

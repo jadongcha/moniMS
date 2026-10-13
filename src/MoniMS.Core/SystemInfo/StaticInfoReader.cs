@@ -1,4 +1,3 @@
-using System.Management;
 using Microsoft.Win32;
 using MoniMS.Core.Interop;
 
@@ -55,23 +54,15 @@ internal static class StaticInfoReader
         return (key?.GetValue("ProcessorNameString") as string)?.Trim() ?? "Unknown CPU";
     }
 
+    /// <summary>
+    /// 메인보드 제조사·모델. Windows가 부팅할 때 SMBIOS에서 읽어 레지스트리에 적어 두는 값이라 WMI(Win32_BaseBoard)와 같다.
+    /// WMI는 처음 부를 때 수백 ms~수 초가 걸려서 위젯이 늦게 떴다.
+    /// </summary>
     private static string ReadMotherboard()
     {
-        try
-        {
-            using var searcher = new ManagementObjectSearcher("SELECT Manufacturer, Product FROM Win32_BaseBoard");
-            foreach (var obj in searcher.Get())
-            {
-                using (obj)
-                {
-                    return $"{obj["Manufacturer"]} {obj["Product"]}".Trim();
-                }
-            }
-        }
-        catch (ManagementException)
-        {
-        }
-        return "Unknown";
+        using var key = Registry.LocalMachine.OpenSubKey(@"HARDWARE\DESCRIPTION\System\BIOS");
+        var name = $"{key?.GetValue("BaseBoardManufacturer") as string} {key?.GetValue("BaseBoardProduct") as string}".Trim();
+        return name.Length > 0 ? name : "Unknown";
     }
 
     /// <summary>

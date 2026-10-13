@@ -132,9 +132,35 @@ public sealed class ThemeApplier
                 settings = ThemeScanner.WithoutCustomScript(settings);
                 warnings.Add($"{WindhawkMods.DisplayName(mod.ModId)}: custom script was not applied.");
             }
+            settings = LocalizeImages(package, mod, settings, warnings);
             writes.Add(new ModSettingsWrite(mod.ModId, settings));
         }
         return writes;
+    }
+
+    /// <summary>
+    /// 인터넷 주소로 된 이미지(시작 버튼 그림 등)를 테마에 들어 있는 파일로 바꾼다.
+    /// 테마를 라이브러리에서 지워도 남도록 themes\_assets\{테마 ID}\ 에 복사.
+    /// </summary>
+    private Dictionary<string, object> LocalizeImages(ThemePackage package, ThemeModConfig mod,
+        Dictionary<string, object> settings, List<string> warnings)
+    {
+        try
+        {
+            var assets = Path.Combine(_library.RootDirectory, "_assets", package.Id);
+            var result = ThemeAssets.LocalizeImages(settings, package.FilesDirectory, assets, out var count);
+            if (count > 0)
+                _logger.LogInformation("{Mod}: {Count} image(s) now load from {Dir}", mod.ModId, count, assets);
+            var remote = ThemeAssets.FindImageUrls(result).Count();
+            if (remote > 0)
+                warnings.Add($"{WindhawkMods.DisplayName(mod.ModId)}: {remote} image(s) are loaded from the internet and may not show while offline.");
+            return result;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _logger.LogWarning(ex, "Could not copy theme images for {Mod}", mod.ModId);
+            return settings;
+        }
     }
 
     private void ApplyApp(ThemePackage package, ThemeAppConfig app, string? variant, FileJournal journal, List<string> warnings, List<string> applied)

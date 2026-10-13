@@ -28,7 +28,8 @@ public sealed partial class ShellIcons : IDisposable
     private readonly Dictionary<string, ImageSource?> _typeIcons = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, ImageSource?> _fileIcons = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, List<Action<ImageSource?>>> _waiting = new(StringComparer.OrdinalIgnoreCase);
-    private readonly BlockingCollection<Request> _queue = new();
+    /// <summary>셸 스레드에서 할 일 (아이콘 읽기, 표시 이름 읽기).</summary>
+    private readonly BlockingCollection<Action> _queue = new();
     private readonly Thread _thread;
 
     private sealed record Request(string Key, string Path, bool PerFile, uint Attributes);
@@ -57,8 +58,48 @@ public sealed partial class ShellIcons : IDisposable
             return null;
         }
         _waiting[request.Key] = [loaded];
-        _queue.Add(request);
+        Enqueue(() =>
+        {
+            ImageSource? icon = null;
+            try
+            {
+                icon = Load(request);
+            }
+            catch (Exception)
+            {
+                // 고장 난 셸 확장 등: 아이콘 없이 보여 준다
+            }
+            _dispatcher.BeginInvoke(DispatcherPriority.Background, () => Complete(request, icon));
+        });
         return null;
+    }
+
+    /// <summary>
+    /// 표시 이름을 셸 스레드에서 읽는다. 바탕 화면·문서처럼 이름이 바뀌어 보이는 폴더의 이름을 읽느라
+    /// desktop.ini를 열기 때문에, 네트워크 폴더면 UI 스레드에서 부를 때 멈출 수 있다.
+    /// </summary>
+    public Task<string> GetDisplayNameAsync(string path)
+    {
+        var result = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (!Enqueue(() => result.TrySetResult(GetDisplayName(path))))
+            result.TrySetResult(GetDisplayName(path));
+        return result.Task;
+    }
+
+    /// <summary>앱을 끄는 중이면 false.</summary>
+    private bool Enqueue(Action work)
+    {
+        if (_queue.IsAddingCompleted)
+            return false;
+        try
+        {
+            _queue.Add(work);
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            return false; // 그사이 종료됨
+        }
     }
 
     private static Request CreateRequest(string path, bool isFolder, FileAttributes attributes)
@@ -79,18 +120,16 @@ public sealed partial class ShellIcons : IDisposable
 
     private void Run()
     {
-        foreach (var request in _queue.GetConsumingEnumerable())
+        foreach (var work in _queue.GetConsumingEnumerable())
         {
-            ImageSource? icon = null;
             try
             {
-                icon = Load(request);
+                work();
             }
             catch (Exception)
             {
-                // 고장 난 셸 확장 등: 아이콘 없이 보여 준다
+                // 고장 난 셸 확장 등: 그 항목만 건너뛴다
             }
-            _dispatcher.BeginInvoke(DispatcherPriority.Background, () => Complete(request, icon));
         }
     }
 
@@ -141,8 +180,13 @@ public sealed partial class ShellIcons : IDisposable
             if (name.Length > 0)
                 return name;
         }
-        var trimmed = Path.TrimEndingDirectorySeparator(path);
-        var fileName = Path.GetFileName(trimmed);
+        return FolderName(path);
+    }
+
+    /// <summary>경로의 마지막 부분 (디스크를 읽지 않는다). 드라이브 루트면 경로 그대로.</summary>
+    public static string FolderName(string path)
+    {
+        var fileName = Path.GetFileName(Path.TrimEndingDirectorySeparator(path));
         return fileName.Length > 0 ? fileName : path;
     }
 

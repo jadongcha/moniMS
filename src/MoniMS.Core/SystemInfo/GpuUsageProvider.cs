@@ -13,7 +13,11 @@ namespace MoniMS.Core.SystemInfo;
 internal sealed partial class GpuUsageProvider
 {
     private const string EngineCounter = "Utilization Percentage";
-    private const string MemoryCounter = "Dedicated Usage";
+    private const string DedicatedCounter = "Dedicated Usage";
+    private const string SharedCounter = "Shared Usage";
+
+    /// <summary>전용 메모리를 이만큼도 안 쓰면 내장 GPU로 본다 (내장 GPU는 전용 메모리 사용량이 항상 0).</summary>
+    private const ulong DedicatedThreshold = 1024 * 1024;
 
     private readonly PerformanceCounterCategory? _engines;
     private readonly PerformanceCounterCategory? _memory;
@@ -25,7 +29,7 @@ internal sealed partial class GpuUsageProvider
         _memory = TryOpen("GPU Adapter Memory");
     }
 
-    public (double? Percent, ulong? DedicatedUsed) Read()
+    public (double? Percent, (ulong Used, bool Shared)? Memory) Read()
     {
         if (_engines is null)
             return (null, null);
@@ -59,28 +63,46 @@ internal sealed partial class GpuUsageProvider
         _previous = current;
 
         var percent = perEngine.Count == 0 ? 0 : Math.Clamp(perEngine.Values.Max(), 0, 100);
-        return (percent, ReadDedicatedMemory());
+        return (percent, ReadMemory());
     }
 
-    /// <summary>어댑터별 전용 메모리 사용량 중 최댓값 (원시 값이라 이전 샘플이 필요 없다).</summary>
-    private ulong? ReadDedicatedMemory()
+    /// <summary>어댑터별 메모리 사용량 중 최댓값 (원시 값이라 이전 샘플이 필요 없다). 전용·공유를 한 번에 읽는다.</summary>
+    private (ulong Used, bool Shared)? ReadMemory()
     {
         if (_memory is null)
             return null;
         try
         {
-            ulong? dedicated = null;
-            if (_memory.ReadCategory()[MemoryCounter] is { } memory)
-            {
-                foreach (InstanceData data in memory.Values)
-                    dedicated = Math.Max(dedicated ?? 0, (ulong)Math.Max(0, data.RawValue));
-            }
-            return dedicated;
+            var counters = _memory.ReadCategory();
+            return ChooseMemory(MaxRaw(counters[DedicatedCounter]), MaxRaw(counters[SharedCounter]));
         }
         catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
         {
             return null;
         }
+    }
+
+    private static ulong? MaxRaw(InstanceDataCollection? counter)
+    {
+        if (counter is null)
+            return null;
+        ulong? max = null;
+        foreach (InstanceData data in counter.Values)
+            max = Math.Max(max ?? 0, (ulong)Math.Max(0, data.RawValue));
+        return max;
+    }
+
+    /// <summary>
+    /// 외장 GPU는 전용 메모리(VRAM). 내장 GPU는 전용 메모리가 없어서 작업 관리자처럼 공유 메모리를 보여 준다
+    /// (전용 사용량만 보면 늘 "0 B"였다).
+    /// </summary>
+    internal static (ulong Used, bool Shared)? ChooseMemory(ulong? dedicated, ulong? shared)
+    {
+        if (dedicated >= DedicatedThreshold)
+            return (dedicated.Value, false);
+        if (shared > 0)
+            return (shared.Value, true);
+        return dedicated is { } d ? (d, false) : null;
     }
 
     /// <summary>"pid_123_luid_0x0_0xABC_phys_0_eng_3_engtype_3D" → "luid_0x0_0xABC_phys_0_eng_3"</summary>

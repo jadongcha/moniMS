@@ -265,13 +265,15 @@ public sealed class ImageWidgetController : IImageWidgetHost, IDisposable
         _loadedPath = null;
         if (_disposed)
             return;
-        _logger.LogInformation("Image widget window was closed; recreating (explorer restart?)");
+        // 앱을 끌 때도 창이 먼저 닫히므로 여기서는 기록하지 않는다 (그때는 이 타이머가 돌지 않는다)
         var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
         timer.Tick += (_, _) =>
         {
             timer.Stop();
-            if (!_disposed && _window is null)
-                ApplyToWindow();
+            if (_disposed || _window is not null)
+                return;
+            _logger.LogInformation("Image widget window was closed; recreating (explorer restart?)");
+            ApplyToWindow();
         };
         timer.Start();
     }

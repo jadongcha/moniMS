@@ -6,6 +6,19 @@ Write upcoming changes under **[Unreleased]**; `release.ps1` moves them into the
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-13
+
+### Changed
+- MoniMS starts faster. It reads the motherboard name directly instead of asking WMI, which could take several seconds right after Windows starts, and the app now comes precompiled.
+
+### Fixed
+- Theme images such as the Gruvbox Start button icon were loaded from GitHub every time, so they stayed blank when the internet or GitHub was unreachable. MoniMS now uses the copy that comes with the theme. Apply the theme again to get the fix.
+- If the file widget had a folder on a network drive that wasn't connected, MoniMS could freeze for up to a minute when it started, when you opened Settings, or when you applied a preset.
+- Renaming a file by changing only upper or lower case (for example `a.txt` → `A.txt`) didn't show in the file widget.
+- The update check right after Windows starts often ran before the internet was ready and then didn't try again. It now tries again a few times.
+- On PCs with only a built-in GPU (Intel, AMD), the info widget always showed "VRAM 0 B". It now shows the shared GPU memory in use, like Task Manager.
+- Uptime said "1 days" or "1 hours". It now says "1 day", "1 hour".
+
 ## [0.4.0] - 2026-10-12
 
 ### Added

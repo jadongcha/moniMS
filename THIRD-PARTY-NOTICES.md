@@ -8,7 +8,7 @@ MoniMS includes or depends on the following third-party components.
 | [Velopack](https://github.com/velopack/velopack) | MIT | Installer and auto-update. |
 | [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet) | MIT | MVVM helpers. |
 | [Microsoft.Extensions.DependencyInjection / Logging](https://github.com/dotnet/runtime) | MIT | Dependency injection and logging. |
-| [System.Management, System.Diagnostics.PerformanceCounter](https://github.com/dotnet/runtime) | MIT | Hardware and performance information. |
+| [System.Diagnostics.PerformanceCounter](https://github.com/dotnet/runtime) | MIT | Performance information. |
 | [.NET](https://github.com/dotnet/runtime) / [WPF](https://github.com/dotnet/wpf) | MIT | Runtime and UI framework (installed separately). |
 
 ## Not included

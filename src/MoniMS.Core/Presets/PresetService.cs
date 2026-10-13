@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using MoniMS.Core.Desktop;
+using MoniMS.Core.Files;
 
 namespace MoniMS.Core.Presets;
 
@@ -215,7 +216,7 @@ public sealed class PresetService
     private static FileWidgetLayout ResolveFileWidget(Preset preset, List<string> warnings)
     {
         var layout = preset.FileWidget!.Clone();
-        var missing = layout.Folders.Count(f => !Directory.Exists(f));
+        var missing = layout.Folders.Count(f => !FolderReader.ProbablyExists(f)); // 위젯 적용은 UI 스레드에서 하므로 네트워크 폴더는 묻지 않는다
         if (missing > 0)
             warnings.Add($"File widget: {missing} folder(s) from the preset can't be found. They stay in the list in case they come back (for example a USB drive).");
         return layout;

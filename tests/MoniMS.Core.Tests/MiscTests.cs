@@ -29,6 +29,23 @@ public class MiscTests
     [InlineData(17179869184d, "16.0 GB")]
     public void Format_bytes(double bytes, string expected) => Assert.Equal(expected, Format.Bytes(bytes));
 
+    [Theory]
+    [InlineData(1, 2, 38, "1 day, 2 hours, 38 mins")]
+    [InlineData(3, 1, 1, "3 days, 1 hour, 1 min")]
+    [InlineData(0, 0, 0, "0 hours, 0 mins")]
+    public void Uptime_uses_singular_for_one(int days, int hours, int minutes, string expected) =>
+        Assert.Equal(expected, Format.Uptime(new TimeSpan(days, hours, minutes, 0)));
+
+    [Theory]
+    [InlineData(2_000_000_000UL, 300_000_000UL, 2_000_000_000UL, false)] // 외장 GPU: 전용 메모리(VRAM)
+    [InlineData(0UL, 1_200_000_000UL, 1_200_000_000UL, true)] // 내장 GPU: 전용 사용량이 늘 0 → 공유 메모리
+    [InlineData(0UL, 0UL, 0UL, false)]
+    public void Gpu_memory_falls_back_to_shared_memory_on_integrated_gpus(ulong dedicated, ulong shared, ulong used, bool isShared) =>
+        Assert.Equal((used, isShared), GpuUsageProvider.ChooseMemory(dedicated, shared));
+
+    [Fact]
+    public void Gpu_memory_is_unknown_without_counters() => Assert.Null(GpuUsageProvider.ChooseMemory(null, null));
+
     [Fact]
     public void WidgetLayout_clone_is_deep_for_sections()
     {

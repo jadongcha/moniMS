@@ -38,7 +38,8 @@ public sealed record SystemSnapshot(
     ulong? GpuMemoryUsedBytes,
     IReadOnlyList<DiskUsage> Disks,
     NetworkStatus? Network,
-    TimeSpan Uptime)
+    TimeSpan Uptime,
+    bool GpuMemoryShared = false)
 {
     public double MemoryPercent => MemoryTotalBytes == 0 ? 0 : MemoryUsedBytes * 100.0 / MemoryTotalBytes;
 }

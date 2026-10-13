@@ -100,10 +100,11 @@ public sealed class SystemMonitor : ISystemMonitor
             MemoryUsedBytes: mem.ullTotalPhys - mem.ullAvailPhys,
             MemoryTotalBytes: mem.ullTotalPhys,
             GpuPercent: gpuPercent,
-            GpuMemoryUsedBytes: gpuMem,
+            GpuMemoryUsedBytes: gpuMem?.Used,
             Disks: disks,
             Network: _network.Read(),
-            Uptime: TimeSpan.FromMilliseconds(Environment.TickCount64));
+            Uptime: TimeSpan.FromMilliseconds(Environment.TickCount64),
+            GpuMemoryShared: gpuMem?.Shared ?? false);
     }
 
     private static List<DiskUsage> ReadDisks()

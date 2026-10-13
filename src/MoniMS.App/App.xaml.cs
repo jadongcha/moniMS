@@ -127,25 +127,40 @@ public partial class App : Application
         return services.BuildServiceProvider();
     }
 
-    /// <summary>시작하고 잠시 뒤 한 번 업데이트를 확인해서, 있으면 트레이 알림만 띄운다.</summary>
+    /// <summary>업데이트 확인 시도 간격. Windows 시작 직후에는 아직 인터넷이 안 될 때가 많아서 실패하면 다시 시도한다.</summary>
+    private static readonly TimeSpan[] UpdateCheckDelays =
+        [TimeSpan.FromSeconds(15), TimeSpan.FromMinutes(2), TimeSpan.FromMinutes(10), TimeSpan.FromMinutes(30)];
+
+    /// <summary>시작하고 잠시 뒤 업데이트를 확인해서, 있으면 트레이 알림만 띄운다.</summary>
     private async Task CheckForUpdatesInBackgroundAsync()
     {
-        try
+        for (var attempt = 0; attempt < UpdateCheckDelays.Length; attempt++)
         {
-            await Task.Delay(TimeSpan.FromSeconds(15));
-            var updates = _services?.GetRequiredService<UpdateService>();
-            if (updates is null || !updates.IsSupported)
-                return;
-            var info = await updates.CheckAsync();
-            if (info is not null)
+            await Task.Delay(UpdateCheckDelays[attempt]);
+            try
             {
-                _services?.GetRequiredService<TrayIconService>().Notify("Update available",
-                    $"MoniMS {info.TargetFullRelease.Version} is ready. Open Settings → General to update.");
+                var updates = _services?.GetRequiredService<UpdateService>();
+                if (updates is null || !updates.IsSupported)
+                    return;
+                var info = await updates.CheckAsync();
+                if (info is not null)
+                {
+                    _services?.GetRequiredService<TrayIconService>().Notify("Update available",
+                        $"MoniMS {info.TargetFullRelease.Version} is ready. Open Settings → General to update.");
+                }
+                return;
             }
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogWarning(ex, "Background update check failed");
+            catch (Exception ex) when (_services is not null)
+            {
+                if (attempt == UpdateCheckDelays.Length - 1)
+                    _logger?.LogWarning(ex, "Background update check failed");
+                else
+                    _logger?.LogInformation("Background update check failed, retrying later: {Message}", ex.Message);
+            }
+            catch (Exception)
+            {
+                return; // 앱이 끝나는 중
+            }
         }
     }
 

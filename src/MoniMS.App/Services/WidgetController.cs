@@ -13,8 +13,8 @@ using MoniMS.Core.Settings;
 namespace MoniMS.App.Services;
 
 /// <summary>
-/// ?꾩젽 李쎌쓽 ?앸챸二쇨린? ?덉씠?꾩썐??愿由? ?꾨━???쒕퉬?ㅻ뒗 IWidgetLayoutHost濡????대옒?ㅻ? ?ъ슜?쒕떎.
-/// ?꾩옱 ?덉씠?꾩썐???먮낯? ??긽 AppSettings.Widget ?대떎.
+/// 위젯 창의 생명주기와 레이아웃을 관리. 프리셋 서비스는 IWidgetLayoutHost로 이 클래스를 사용한다.
+/// 현재 레이아웃의 원본은 항상 AppSettings.Widget 이다.
 /// </summary>
 public sealed class WidgetController : IWidgetLayoutHost, IDisposable
 {
@@ -33,10 +33,10 @@ public sealed class WidgetController : IWidgetLayoutHost, IDisposable
         _theme = theme;
         _logger = logger;
         SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
-        SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged; // ?댁긽?꽷룸같??蹂寃?
+        SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged; // 해상도·배율 변경
     }
 
-    /// <summary>?덉씠?꾩썐??諛붾??뚮쭏??(?몃젅??硫붾돱/?ㅼ젙 李?媛깆떊??.</summary>
+    /// <summary>레이아웃이 바뀔 때마다 (트레이 메뉴/설정 창 갱신용).</summary>
     public event EventHandler? LayoutChanged;
 
     public WidgetLayout Layout => _settings.Current.Widget;
@@ -54,14 +54,14 @@ public sealed class WidgetController : IWidgetLayoutHost, IDisposable
     public void ApplyLayout(WidgetLayout layout)
     {
         layout = layout.Clone();
-        layout.UpgradeLegacySize(); // ?덉쟾 湲곕낯 ?덈퉬濡???λ맂 ?꾨━?뗫룄 吏湲??덈퉬濡?
+        layout.UpgradeLegacySize(); // 예전 기본 너비로 저장된 프리셋도 지금 너비로
         _settings.Current.Widget = layout;
         _settings.Save();
         ApplyToWindow();
         LayoutChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    /// <summary>?꾩옱 ?덉씠?꾩썐 ?쇰?留?諛붽? ??</summary>
+    /// <summary>현재 레이아웃 일부만 바꿀 때.</summary>
     public void Update(Action<WidgetLayout> change)
     {
         var copy = Layout.Clone();
@@ -84,7 +84,7 @@ public sealed class WidgetController : IWidgetLayoutHost, IDisposable
 
         _vm.ApplyLayout(layout);
         var accent = string.IsNullOrWhiteSpace(layout.AccentColor) ? _theme.GetAccentColor() : SafeParse(layout.AccentColor);
-        // ?몄쭛 紐⑤뱶?먯꽑 ?꾩쟾 ?щ챸??諛곌꼍???≪쓣 ???덈룄濡??댁쭩 蹂댁씠寃??쒕떎 (?щ챸 ?쎌?? 留덉슦?ㅺ? ?듦낵?섎?濡?
+        // 편집 모드에선 완전 투명한 배경도 잡을 수 있도록 살짝 보이게 한다 (투명 픽셀은 마우스가 통과하므로)
         var bgOpacity = _vm.IsEditMode ? Math.Max(layout.Opacity, 0.35) : layout.Opacity;
         _window.ApplyStyle(layout.Style, accent, bgOpacity);
         _window.ApplyFont(layout.FontFamily);
@@ -94,14 +94,14 @@ public sealed class WidgetController : IWidgetLayoutHost, IDisposable
 
         if (firstRun)
         {
-            // 泥??ㅽ뻾: 二?紐⑤땲???ㅻⅨ履???
+            // 첫 실행: 주 모니터 오른쪽 위
             var work = SystemParameters.WorkArea;
             _window.Left = work.Right - _vm.WindowWidth - EdgeMargin;
             _window.Top = work.Top + EdgeMargin;
         }
         else
         {
-            // 紐⑤땲??援ъ꽦??諛붾뚯뼱 ?붾㈃ 諛뽰쑝濡??섍???寃쎌슦 諛⑹?
+            // 모니터 구성이 바뀌어 화면 밖으로 나가는 경우 방지
             _window.Left = Math.Clamp(layout.Left, SystemParameters.VirtualScreenLeft,
                 SystemParameters.VirtualScreenLeft + SystemParameters.VirtualScreenWidth - 80);
             _window.Top = Math.Clamp(layout.Top, SystemParameters.VirtualScreenTop,
@@ -109,7 +109,7 @@ public sealed class WidgetController : IWidgetLayoutHost, IDisposable
         }
 
         if (!firstRun)
-            FitToMonitor(); // ?꾩튂瑜???릿 ???ㅻⅨ 紐⑤땲?곕씪硫?洹?紐⑤땲??湲곗??쇰줈 ?ㅼ떆
+            FitToMonitor(); // 위치를 옮긴 뒤 다른 모니터라면 그 모니터 기준으로 다시
 
         if (layout.Visible)
         {
@@ -121,8 +121,8 @@ public sealed class WidgetController : IWidgetLayoutHost, IDisposable
             _window.Hide();
         }
 
-        // ?몄쭛 以묒뿉???쒕옒洹명빐???섎?濡??대┃ ?듦낵瑜??덈떎
-        // ??긽 ?대┃ ?듦낵. ?몄쭛 紐⑤뱶?먯꽌留??꾩젽???↔퀬 ?????덇쾶 ?덈떎.
+        // 편집 중에는 드래그해야 하므로 클릭 통과를 끈다
+        // 항상 클릭 통과. 편집 모드에서만 위젯을 잡고 끌 수 있게 끈다.
         var clickThrough = !_vm.IsEditMode;
         var ex = DesktopPinning.SetClickThrough(_window, clickThrough);
         _logger.LogInformation("Click-through requested={Requested}, applied={Applied} (exStyle=0x{Ex:X})",
@@ -133,8 +133,8 @@ public sealed class WidgetController : IWidgetLayoutHost, IDisposable
     private (int, int, double) _fittedMetrics;
 
     /// <summary>
-    /// ?댁긽?꾧? ?щ씪???붾㈃?먯꽌 媛숈? 鍮꾩쑉濡?蹂댁씠?꾨줉 李??ш린瑜?留욎텣??
-    /// (湲곗?: 2880횞1800 ?붾㈃?먯꽌 蹂댁씠??鍮꾩쑉, <see cref="WidgetSizing"/>).
+    /// 해상도가 달라도 화면에서 같은 비율로 보이도록 창 크기를 맞춘다.
+    /// (기준: 2880×1800 화면에서 보이는 비율, <see cref="WidgetSizing"/>).
     /// </summary>
     private void FitToMonitor(bool primary = false)
     {
@@ -161,7 +161,7 @@ public sealed class WidgetController : IWidgetLayoutHost, IDisposable
         if (w is null)
             return;
         w.Dispatcher.BeginInvoke(DispatcherPriority.Background, () => FitToMonitor());
-        // ?댁긽?꽷룸같??蹂寃?吏곹썑?먮뒗 Windows/WPF媛 李??ш린瑜???踰???議곗젙?섎?濡??좎떆 ???ㅼ떆 留욎텣??
+        // 해상도·배율 변경 직후에는 Windows/WPF가 창 크기를 한 번 더 조정하므로 잠시 뒤 다시 맞춘다.
         var timer = new DispatcherTimer(DispatcherPriority.Background, w.Dispatcher) { Interval = TimeSpan.FromSeconds(1.5) };
         timer.Tick += (_, _) =>
         {
@@ -181,19 +181,19 @@ public sealed class WidgetController : IWidgetLayoutHost, IDisposable
             _settings.Current.Widget.Left = window.Left;
             _settings.Current.Widget.Top = window.Top;
             _settings.Save();
-            FitToMonitor(); // ?ㅻⅨ 紐⑤땲?곕줈 ??꼈?????덉쓬
+            FitToMonitor(); // 다른 모니터로 옮겼을 수 있음
         };
         window.Closed += OnWindowClosed;
         var hwnd = new WindowInteropHelper(window).EnsureHandle();
-        // ?щ챸(?덉씠?대뱶) 李쎌? GPU濡?洹몃젮??留ㅻ쾲 CPU濡??쎌뼱 ????댁꽌 ?댁젏???녾퀬, GPU ?쒕씪?대쾭留?硫붾え由ъ뿉 ?щ씪媛꾨떎.
-        // 1珥덉뿉 ??踰?諛붾뚮뒗 ?꾩젽?대씪 ?뚰봽?몄썾???뚮뜑留곸씠 ??媛蹂띾떎 (泥??뚮뜑留??꾩뿉 吏?뺥빐???μ튂媛 ??留뚮뱾?댁쭚).
+        // 투명(레이어드) 창은 GPU로 그려도 매번 CPU로 읽어 와야 해서 이점이 없고, GPU 드라이버만 메모리에 올라간다.
+        // 1초에 한 번 바뀌는 위젯이라 소프트웨어 렌더링이 더 가볍다 (첫 렌더링 전에 지정해야 장치가 안 만들어짐).
         if (HwndSource.FromHwnd(hwnd)?.CompositionTarget is { } target)
             target.RenderMode = RenderMode.SoftwareOnly;
         _window = window;
     }
 
     /// <summary>
-    /// ?뚯쑀?먯씤 諛뷀깢?붾㈃ 李쎌씠 ?щ씪吏硫?explorer ?ъ떆?? ?꾩젽 李쎈룄 ?④퍡 ?뚭눼?쒕떎. ?좎떆 ???ㅼ떆 留뚮뱺??
+    /// 소유자인 바탕화면 창이 사라지면(explorer 재시작) 위젯 창도 함께 파괴된다. 잠시 뒤 다시 만든다.
     /// </summary>
     private void OnWindowClosed(object? sender, EventArgs e)
     {
@@ -217,7 +217,7 @@ public sealed class WidgetController : IWidgetLayoutHost, IDisposable
     {
         if (_window is null)
             return;
-        // 李쎌씠 ?댁븘?⑥븯?ㅻ㈃ ??Progman???ㅼ떆 遺숈씤??
+        // 창이 살아남았다면 새 Progman에 다시 붙인다
         var w = _window;
         w.Dispatcher.BeginInvoke(DispatcherPriority.Background, () =>
         {
@@ -231,7 +231,7 @@ public sealed class WidgetController : IWidgetLayoutHost, IDisposable
 
     private void OnUserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
     {
-        // Windows 媛뺤“?됱씠 諛붾뚮㈃ ?꾩젽 ?됰룄 ?곕씪媛?
+        // Windows 강조색이 바뀌면 위젯 색도 따라감
         if (e.Category is UserPreferenceCategory.General or UserPreferenceCategory.Color or UserPreferenceCategory.VisualStyle)
             _window?.Dispatcher.BeginInvoke(ApplyToWindow);
     }

@@ -27,12 +27,17 @@ public sealed class FileWidgetController : IFileWidgetHost, IDisposable
     private FileWidgetWindow? _window;
     private bool _disposed;
 
+    /// <summary>폴더를 옮겨 다닐 때마다 설정 파일을 쓰지 않도록 잠깐 모았다가 한 번에 저장한다.</summary>
+    private readonly DispatcherTimer _saveTimer;
+
     public FileWidgetController(ISettingsStore settings, IThemeService theme, FileWidgetViewModel vm, ILogger<FileWidgetController> logger)
     {
         _settings = settings;
         _theme = theme;
         _vm = vm;
         _logger = logger;
+        _saveTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(2) };
+        _saveTimer.Tick += (_, _) => SaveNow();
         _vm.StateChanged += OnViewStateChanged;
         SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
         SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
@@ -133,7 +138,7 @@ public sealed class FileWidgetController : IFileWidgetHost, IDisposable
         _vm.SetActive(true);
     }
 
-    /// <summary>위젯 안에서 연 폴더·정렬·열 너비는 바로 저장한다 (다음 실행 때 그대로).</summary>
+    /// <summary>위젯 안에서 연 폴더·정렬·열 너비를 기억한다 (다음 실행 때 그대로). 저장은 잠시 뒤 한 번에.</summary>
     private void OnViewStateChanged(object? sender, EventArgs e)
     {
         var l = Layout;
@@ -141,6 +146,13 @@ public sealed class FileWidgetController : IFileWidgetHost, IDisposable
         l.SortBy = _vm.SortBy;
         l.SortDescending = _vm.SortDescending;
         l.ExtensionColumnWidth = _vm.ExtensionColumnWidth;
+        _saveTimer.Stop();
+        _saveTimer.Start();
+    }
+
+    private void SaveNow()
+    {
+        _saveTimer.Stop();
         _settings.Save();
     }
 
@@ -175,13 +187,15 @@ public sealed class FileWidgetController : IFileWidgetHost, IDisposable
         _vm.SetActive(false);
         if (_disposed)
             return;
-        _logger.LogInformation("File widget window was closed; recreating (explorer restart?)");
+        // 앱을 끌 때도 창이 먼저 닫히므로 여기서는 기록하지 않는다 (그때는 이 타이머가 돌지 않는다)
         var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
         timer.Tick += (_, _) =>
         {
             timer.Stop();
-            if (!_disposed && _window is null)
-                ApplyToWindow();
+            if (_disposed || _window is not null)
+                return;
+            _logger.LogInformation("File widget window was closed; recreating (explorer restart?)");
+            ApplyToWindow();
         };
         timer.Start();
     }
@@ -212,6 +226,8 @@ public sealed class FileWidgetController : IFileWidgetHost, IDisposable
     public void Dispose()
     {
         _disposed = true;
+        if (_saveTimer.IsEnabled)
+            SaveNow(); // 아직 저장하지 않은 폴더 이동
         SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
         SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
         _vm.StateChanged -= OnViewStateChanged;
