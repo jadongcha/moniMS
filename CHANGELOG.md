@@ -6,6 +6,11 @@ Write upcoming changes under **[Unreleased]**; `release.ps1` moves them into the
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-10-14
+
+### Changed
+- Widgets that snap next to each other now sit half as far apart.
+
 ## [0.5.1] - 2026-10-14
 
 ### Added

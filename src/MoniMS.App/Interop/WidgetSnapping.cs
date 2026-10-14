@@ -13,7 +13,7 @@ namespace MoniMS.App.Interop;
 internal static partial class WidgetSnapping
 {
     /// <summary>위젯 사이 간격 (DIP).</summary>
-    public const double Gap = 12;
+    public const double Gap = 6;
 
     /// <summary>화면 가장자리와의 간격 (DIP). 위젯을 처음 놓는 위치와 같다.</summary>
     public const double EdgeMargin = 24;

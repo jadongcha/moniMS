@@ -4,7 +4,7 @@ namespace MoniMS.Core.Tests;
 
 public class WidgetSnapTests
 {
-    private const int Gap = 12;
+    private const int Gap = 6;
     private const int EdgeMargin = 24;
     private const int Threshold = 16;
 
@@ -83,7 +83,7 @@ public class WidgetSnapTests
     [Fact]
     public void The_closest_spot_wins()
     {
-        // A 옆 간격 자리(812)와 A 오른쪽 끝 맞추기(600)가 아니라, 더 가까운 B 왼쪽 끝(815)
+        // A 옆 간격 자리(806)와 A 오른쪽 끝 맞추기(600)가 아니라, 더 가까운 B 왼쪽 끝(815)
         var b = At(815, 700);
         var moving = At(818, A.Top);
         var (dx, _) = Snap(moving, A, b);
