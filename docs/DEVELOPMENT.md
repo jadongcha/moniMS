@@ -106,6 +106,7 @@ MoniMS.sln
 | 테마색 | `HKCU\...\Themes\Personalize`, `DWM`, `Explorer\Accent`, `Control Panel\Desktop`(배경화면에서 강조색 자동 선택) 레지스트리 값을 쓰고 `WM_SETTINGCHANGE("ImmersiveColorSet")` 등을 브로드캐스트. 브로드캐스트는 모든 창의 응답을 기다려 수 초가 걸릴 수 있어서, 이미 같은 상태면 건너뜀 |
 | 아이콘 배치 | 바탕화면 `SysListView32`에 `LVM_GETITEMPOSITION`/`LVM_SETITEMPOSITION` 전송. explorer 프로세스에 원격 버퍼를 할당해 사용. 아이콘은 이름으로 짝짓고(같은 이름은 순서대로), 해상도가 바뀌면 비율로 보정. 이미 그 자리에 있는 아이콘은 건너뜀 |
 | 위젯 고정 | 창 소유자를 `Progman`으로 지정해 Win+D에도 유지. `WM_WINDOWPOSCHANGING`을 가로채 항상 맨 아래에 둠. 클릭 통과는 `WS_EX_LAYERED` + `WS_EX_TRANSPARENT`이고, WPF가 확장 스타일을 덮어쓰지 않도록 `WM_STYLECHANGING`에서 다시 강제. explorer가 재시작되면(`TaskbarCreated`) 창을 다시 만들고, 소유자와 함께 창이 없어졌으면 3초 뒤 다시 만듦 |
+| 위젯 자석 | 편집 모드에서 끌 때(`DragMove`의 이동 루프) 오는 `WM_MOVING`에서 갈 자리를 고침 (`WidgetSnapping`, 계산은 Core의 `WidgetSnap`). 다른 위젯과 위·아래·왼쪽·오른쪽 끝 맞추기, 옆·위·아래에 12 DIP 띄워 붙이기(그 위젯과 겹쳐 있을 때만), 작업 영역 가장자리에서 24 DIP. 16 DIP 안으로 오면 붙고 가로·세로를 따로 정함. 정보 위젯은 창 안쪽 8 DIP에 카드가 있어서 카드끼리 맞춤. 크기 조절에는 적용하지 않음 |
 | 위젯 크기 | 정보 위젯은 기준 화면(2880×1800, 배율 200%)에서 차지하는 비율을 어느 해상도·배율에서나 유지 (`WidgetSizing`, `MonitorMetrics`). 해상도·배율이 바뀌거나 다른 모니터로 옮기면 다시 맞춤 |
 | 위젯 그리기 | 투명(레이어드) 창은 GPU로 그려도 매번 CPU로 읽어 와야 해서, 위젯 창은 소프트웨어 렌더링(`RenderMode.SoftwareOnly`)을 씀 |
 | 사진 위젯 | 고른 사진은 `ImageStore`에 복사해서 씀. 디코딩은 백그라운드에서 하고, 파일을 메모리로 읽어 잠그지 않음. EXIF 회전을 반영하고 큰 사진은 줄여서 디코딩. 크기 조절은 `WS_THICKFRAME` 없이 직접 처리 (화면 가장자리 스냅으로 비율이 깨지지 않게) |

@@ -66,6 +66,7 @@ Save your whole desktop look and switch between looks in one click.
 ## Using MoniMS
 
 - **Tray icon:** MoniMS lives in the notification area. Right-click the icon for presets, widget options and settings. Double-click it to open Settings.
+- **Moving widgets:** turn on **Edit widgets** in the tray menu and drag. A widget snaps into place near another widget: beside it with a small gap and the top or bottom edges lined up, or below it with the left or right edges lined up. It also keeps a neat margin from the screen edges. Drag a little further to pull it away.
 - **Settings window:** has a light/dark switch in the top-right corner.
 - **Start with Windows:** turn it on in **Settings → General**.
 

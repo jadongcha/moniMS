@@ -127,6 +127,7 @@ public sealed class MediaWidgetController : IMediaWidgetHost, IDisposable
         };
         window.Closed += OnWindowClosed;
         var hwnd = new WindowInteropHelper(window).EnsureHandle();
+        WidgetSnapping.Attach(window); // 끌어 옮길 때 다른 위젯·화면 가장자리에 가지런히 붙는다
         _vm.IsCovered = () => window.IsVisible && Occlusion.IsCovered(hwnd);
         // 투명(레이어드) 창은 GPU로 그려도 매번 CPU로 읽어 와야 해서 이점이 없다 (다른 위젯과 같은 이유)
         if (HwndSource.FromHwnd(hwnd)?.CompositionTarget is { } target)

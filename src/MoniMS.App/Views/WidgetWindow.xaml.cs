@@ -9,6 +9,9 @@ namespace MoniMS.App.Views;
 
 public partial class WidgetWindow : Window
 {
+    /// <summary>창 가장자리와 카드 사이의 투명한 여백 (DIP). XAML의 Root Margin과 같아야 한다.</summary>
+    public const double CardMargin = 8;
+
     private readonly WidgetViewModel _vm;
 
     public WidgetWindow(WidgetViewModel vm)

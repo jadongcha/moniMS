@@ -251,6 +251,7 @@ public sealed class ImageWidgetController : IImageWidgetHost, IDisposable
         };
         window.Closed += OnWindowClosed;
         var hwnd = new WindowInteropHelper(window).EnsureHandle();
+        WidgetSnapping.Attach(window); // 끌어 옮길 때 다른 위젯·화면 가장자리에 가지런히 붙는다
         // 투명(레이어드) 창은 GPU로 그려도 매번 CPU로 읽어 와야 해서 이점이 없고 GPU 드라이버 메모리만 늘어난다
         if (HwndSource.FromHwnd(hwnd)?.CompositionTarget is { } target)
             target.RenderMode = RenderMode.SoftwareOnly;

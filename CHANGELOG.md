@@ -6,6 +6,11 @@ Write upcoming changes under **[Unreleased]**; `release.ps1` moves them into the
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-14
+
+### Added
+- **Widgets snap into place** when you move them: next to another widget they keep a small gap and line up their top or bottom edges, below one they line up their left or right edges, and near the screen edge they keep a neat margin. Drag a little further to pull a widget away.
+
 ## [0.5.0] - 2026-10-14
 
 ### Added

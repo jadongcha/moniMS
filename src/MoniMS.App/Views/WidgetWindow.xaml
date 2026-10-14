@@ -155,6 +155,7 @@
         </DataTemplate>
     </Window.Resources>
 
+    <!-- Margin은 WidgetWindow.CardMargin과 같게 (위젯 자석이 카드 가장자리끼리 맞춘다) -->
     <Grid x:Name="Root" Margin="8">
         <Border x:Name="Card" CornerRadius="14" Padding="18,16" ClipToBounds="True"
                 Background="{DynamicResource WidgetBackground}"

@@ -185,6 +185,7 @@ public sealed class WidgetController : IWidgetLayoutHost, IDisposable
         };
         window.Closed += OnWindowClosed;
         var hwnd = new WindowInteropHelper(window).EnsureHandle();
+        WidgetSnapping.Attach(window, WidgetWindow.CardMargin); // 끌어 옮길 때 다른 위젯·화면 가장자리에 가지런히 붙는다
         // 투명(레이어드) 창은 GPU로 그려도 매번 CPU로 읽어 와야 해서 이점이 없고, GPU 드라이버만 메모리에 올라간다.
         // 1초에 한 번 바뀌는 위젯이라 소프트웨어 렌더링이 더 가볍다 (첫 렌더링 전에 지정해야 장치가 안 만들어짐).
         if (HwndSource.FromHwnd(hwnd)?.CompositionTarget is { } target)
