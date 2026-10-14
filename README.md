@@ -1,6 +1,6 @@
 # MoniMS
 
-**A desktop companion for Windows 11:** switchable desktop presets, a live system-info widget, a picture/GIF widget, a file widget, and one-click themes for the taskbar, Start menu, Windows Terminal, Discord, Komorebi and YASB.
+**A desktop companion for Windows 11:** switchable desktop presets, a live system-info widget, a picture/GIF widget, a file widget and a media widget for Spotify and YouTube.
 
 [한국어 안내 →](README.ko.md)
 
@@ -45,40 +45,23 @@ A small File Explorer on your desktop, behind your windows.
 - **Move & resize:** turn on **Move & resize** (or **Edit widgets** in the tray menu), then drag it or drag an edge or corner.
 - **Styles:** Dark, Light, Glass, with adjustable background opacity.
 
+### 🎵 Media widget
+See what's playing and control it from your desktop.
+
+- **Works with:** Spotify, YouTube and YouTube Music in your browser, the YouTube Music app, and other players that show up in the Windows volume flyout.
+- **Shows:** album art, title, artist, the app and how far into the song you are. Click or drag the time bar to jump to any point.
+- **Controls:** previous, play/pause, next, and a volume slider (click the speaker to mute, or scroll over the widget). By default the slider changes only the playing app's volume, so other sounds stay as they are. In **Settings → Media widget** you can make it change the Windows volume instead.
+- **More than one player open?** The widget shows the one you started last. Click the app name on the widget to switch.
+- **Turn it on** in **Settings → Media widget** or with **Show media widget** in the tray menu. Move & resize and styles work like the other widgets, and you can pick the color of the play button and bars there.
+
 ### 🎨 Presets
 Save your whole desktop look and switch between looks in one click.
 
-- **What a preset saves:** wallpaper (per monitor, copied so it survives deletion), dark/light mode and accent color, desktop icon positions, the info widget layout, the image widget (its picture is copied into the preset too), and the file widget (folders, position and size).
+- **What a preset saves:** wallpaper (per monitor, copied so it survives deletion), dark/light mode and accent color, desktop icon positions, the info widget layout, the image widget (its picture is copied into the preset too), the file widget (folders, position and size) and the media widget (position, size, style and color).
 - **Switching:** apply a preset from the tray menu or from **Settings → Presets**. Click a preset to preview it first.
 
 > Icon layouts restore **positions only**. Files or shortcuts you deleted from the desktop are not recreated.
 > For icon layouts to stick, turn off desktop right-click → **View → Auto arrange icons**.
-
-### 🧩 Themes: taskbar, Start menu, Terminal, Discord, Komorebi & YASB
-Restyle Windows with themes shared online, for example *Gruvbox Material* or someone's dotfiles repo. One theme package can restyle several things at once:
-
-| Part | What MoniMS changes | You need |
-|---|---|---|
-| Taskbar, Start menu, notification center | Windhawk mod settings | **[Windhawk](https://windhawk.net)** and the mods the theme uses |
-| Windows Terminal | Adds the color schemes and look (font, opacity, padding) to your settings. Your profiles and key bindings are kept. | Windows Terminal |
-| Discord | Puts the theme into your client mod's theme folder and turns it on. A Discord theme you applied earlier from the library is turned off. | **Vencord**, Vesktop, Equicord or BetterDiscord (plain Discord can't load themes) |
-| Komorebi | Adds the look (color theme, borders, padding, transparency, animation) to your `komorebi.json`. Your monitors, workspaces and rules are kept. whkd key bindings are added only if you have none. | **[komorebi](https://github.com/LGUG2Z/komorebi)** |
-| YASB | Replaces your `config.yaml` and `styles.css` with the theme's (a YASB theme's styles only fit its own bar layout) | **[YASB](https://github.com/amnweb/yasb)** |
-
-If a package has more than one theme for the same app (for example two Discord themes), pick one from the list under that app.
-
-1. In **Settings → Themes**, paste a GitHub link, a `.zip` link, or browse to a local file (`.zip`, `.json`, `.css` or a folder), then press **Import**.
-2. Tick the parts you want. You can also pick one of the theme's wallpapers.
-3. Press **Apply**. Windows asks for permission once if Windhawk settings change.
-
-- **Missing pieces:** if a part needs something you don't have, MoniMS shows a link to get it (**Install mod**, **Get Terminal**, **Get Vencord**, **Get Komorebi**, **Get YASB**).
-- **Fonts:** themes often use a specific font (Gruvbox uses *JetBrainsMono Nerd Font* and *DM Mono*). If it isn't installed, MoniMS keeps your current font and tells you.
-- **Discord:** fully quit Discord (also from the tray) and open it again after applying.
-- **Komorebi & YASB:** YASB reloads by itself. A running komorebi is told to load the new settings; if that fails, restart komorebi.
-- **Undo:** everything MoniMS changes is backed up first. Press **Restore** to undo the last apply, or **Reset** (next to ↻ above the library) to go back to how Windows looked before you applied any theme, wallpaper included.
-- **Custom scripts:** themes that contain custom scripts are applied without them, unless you allow the scripts.
-
-> Discord client mods are not allowed by Discord's Terms of Service. MoniMS never installs them; it only uses one you already have.
 
 ## Using MoniMS
 
@@ -88,8 +71,8 @@ If a package has more than one theme for the same app (for example two Discord t
 
 ## Your data & privacy
 
-- **Data:** everything stays on your PC, in `%APPDATA%\MoniMS` (presets, imported themes, settings, logs).
-- **Network use:** MoniMS connects to the internet only to download themes you import and to check GitHub for updates.
+- **Data:** everything stays on your PC, in `%APPDATA%\MoniMS` (presets, settings, logs).
+- **Network use:** MoniMS connects to the internet only to check GitHub for updates.
 - **No tracking:** no telemetry, no accounts, no ads.
 - **Uninstall:** use **Settings → Apps**. Your data folder is kept. Delete it yourself if you want a clean slate.
 
@@ -99,9 +82,6 @@ If a package has more than one theme for the same app (for example two Discord t
 |---|---|
 | Widget disappeared after Explorer crashed | It comes back within a few seconds. If not, toggle **Show widget** in the tray menu. |
 | Icon layout didn't restore | Turn off **Auto arrange icons**, then apply the preset again. |
-| Theme applied but nothing changed | Make sure the matching mod is installed **and enabled** in Windhawk. |
-| Terminal colors didn't change in one profile | That profile has its own color scheme. Clear it in Terminal → Settings → that profile → Appearance. |
-| Discord theme not showing | Fully quit Discord and reopen it. In Vencord, check **Settings → Themes**. |
 | Something else | Check `%APPDATA%\MoniMS\logs\moniMS.log` and [open an issue](../../issues). |
 
 ## Building from source
@@ -111,4 +91,4 @@ See **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** (Korean) for build steps, arc
 ## License
 
 MoniMS is released under the [MIT License](LICENSE). Bundled third-party components are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
-MoniMS is not affiliated with Microsoft or Windhawk.
+MoniMS is not affiliated with Microsoft.

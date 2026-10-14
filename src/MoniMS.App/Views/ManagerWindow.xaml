@@ -6,6 +6,72 @@
         WindowStartupLocation="CenterScreen" Style="{StaticResource AppWindow}"
         Icon="/Assets/moniMS.ico">
 
+    <Window.Resources>
+        <!-- 색 고르기 (정보 위젯 그래프 색, 음악 위젯 버튼 색): 드롭다운처럼 생긴 버튼을 누르면 색 표가 펼쳐진다 + Windows 강조색 따라가기 -->
+        <DataTemplate DataType="{x:Type vm:ColorPickerViewModel}">
+            <StackPanel>
+                <Grid Width="240" Height="32" HorizontalAlignment="Left">
+                    <!-- 표가 열린 동안에는 버튼이 클릭을 받지 않는다 (받으면 닫혔다가 바로 다시 열림) -->
+                    <ToggleButton x:Name="ColorButton" Style="{StaticResource ComboToggle}" Focusable="True"
+                                  IsChecked="{Binding IsOpen}"
+                                  IsHitTestVisible="{Binding IsOpen, ElementName=ColorPopup, Converter={StaticResource InverseBool}}"
+                                  AutomationProperties.Name="{Binding ChooseText}" ToolTip="Choose a color" />
+                    <StackPanel Orientation="Horizontal" Margin="6,0,28,0" IsHitTestVisible="False">
+                        <Border Width="20" Height="20" CornerRadius="4" Background="{Binding PreviewBrush}"
+                                BorderBrush="{DynamicResource StrongStrokeBrush}" BorderThickness="1" />
+                        <TextBlock Text="{Binding Text}" VerticalAlignment="Center" Margin="8,0,0,0"
+                                   TextTrimming="CharacterEllipsis" MaxWidth="180" />
+                    </StackPanel>
+                </Grid>
+                <CheckBox Content="Use Windows accent color" IsChecked="{Binding UseWindowsAccent}" Margin="0,6,0,0"
+                          ToolTip="Follow the Windows accent color (Settings → Personalization → Colors)" />
+                <Popup x:Name="ColorPopup" IsOpen="{Binding IsOpen}" PlacementTarget="{Binding ElementName=ColorButton}"
+                       Placement="Bottom" VerticalOffset="4" StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade">
+                    <Border Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource StrokeBrush}"
+                            BorderThickness="1" CornerRadius="8" Padding="8">
+                        <ListBox ItemsSource="{Binding ColorSwatches}" SelectedItem="{Binding SelectedSwatch}"
+                                 HorizontalAlignment="Left" BorderThickness="0" Background="Transparent" Padding="0"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                                 AutomationProperties.Name="{Binding Name}">
+                            <ListBox.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Columns="{Binding ColorColumns}" />
+                                </ItemsPanelTemplate>
+                            </ListBox.ItemsPanel>
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="Margin" Value="1" />
+                                    <Setter Property="Cursor" Value="Hand" />
+                                    <Setter Property="ToolTip" Value="{Binding Hex}" />
+                                    <Setter Property="AutomationProperties.Name" Value="{Binding Hex}" />
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <!-- 칸 하나: 고른 칸은 테두리 링, 마우스를 올리면 옅은 링 -->
+                                            <ControlTemplate TargetType="ListBoxItem">
+                                                <Border x:Name="Ring" Width="23" Height="23" CornerRadius="5" Padding="2"
+                                                        BorderThickness="2" BorderBrush="Transparent" Background="Transparent">
+                                                    <Border CornerRadius="3" Background="{Binding Brush}" />
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Ring" Property="BorderBrush" Value="{DynamicResource StrongStrokeBrush}" />
+                                                    </Trigger>
+                                                    <Trigger Property="IsSelected" Value="True">
+                                                        <Setter TargetName="Ring" Property="BorderBrush" Value="{DynamicResource TextBrush}" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                        </ListBox>
+                    </Border>
+                </Popup>
+            </StackPanel>
+        </DataTemplate>
+    </Window.Resources>
+
     <DockPanel Margin="24,20,24,16">
         <!-- 헤더 -->
         <DockPanel DockPanel.Dock="Top">
@@ -171,6 +237,16 @@
                                                                HorizontalAlignment="Center" VerticalAlignment="Center" />
                                                 </Border>
                                             </Canvas>
+                                            <!-- 음악 위젯: 저장된 위치·크기 -->
+                                            <Canvas Visibility="{Binding HasMedia, Converter={StaticResource BoolToVisibility}}">
+                                                <Border Canvas.Left="{Binding MediaLeft}" Canvas.Top="{Binding MediaTop}"
+                                                        Width="{Binding MediaWidth}" Height="{Binding MediaHeight}"
+                                                        CornerRadius="16" Background="{Binding MediaBrush}"
+                                                        BorderBrush="{DynamicResource AccentBrush}" BorderThickness="6">
+                                                    <TextBlock Text="MEDIA" Foreground="White" FontSize="56" FontWeight="Bold"
+                                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+                                            </Canvas>
                                             <!-- 작업표시줄 자리 -->
                                             <Border Height="48" VerticalAlignment="Bottom" Background="#99101216" />
                                         </Grid>
@@ -223,6 +299,7 @@
                             <CheckBox Content="Info widget layout" IsChecked="{Binding IncludeWidget}" />
                             <CheckBox Content="Image widget (picture · position · size)" IsChecked="{Binding IncludeImageWidget}" />
                             <CheckBox Content="File widget (folders · position · size)" IsChecked="{Binding IncludeFileWidget}" />
+                            <CheckBox Content="Media widget (position · size · style)" IsChecked="{Binding IncludeMediaWidget}" />
                             <Button Content="Save as new preset" Style="{StaticResource PrimaryButton}"
                                     Command="{Binding SaveNewCommand}" Margin="0,12,0,0" HorizontalAlignment="Stretch" />
                             <TextBlock Style="{StaticResource Hint}" Margin="0,10,0,0"
@@ -276,66 +353,8 @@
 
                             <!-- 너비/높이/배율 슬라이더는 제거됨 (값은 설정·프리셋에 저장된 그대로 사용) -->
 
-                            <!-- 그래프 색: 드롭다운처럼 생긴 버튼을 누르면 색 표가 펼쳐진다 + Windows 강조색 따라가기 -->
                             <TextBlock Margin="0,14,0,2" Style="{StaticResource Hint}" Text="Graph color" />
-                            <Grid Width="240" Height="32" HorizontalAlignment="Left">
-                                <!-- 표가 열린 동안에는 버튼이 클릭을 받지 않는다 (받으면 닫혔다가 바로 다시 열림) -->
-                                <ToggleButton x:Name="ColorButton" Style="{StaticResource ComboToggle}" Focusable="True"
-                                              IsChecked="{Binding IsColorPickerOpen}"
-                                              IsHitTestVisible="{Binding IsOpen, ElementName=ColorPopup, Converter={StaticResource InverseBool}}"
-                                              AutomationProperties.Name="Choose graph color" ToolTip="Choose a color" />
-                                <StackPanel Orientation="Horizontal" Margin="6,0,28,0" IsHitTestVisible="False">
-                                    <Border Width="20" Height="20" CornerRadius="4" Background="{Binding GraphColorBrush}"
-                                            BorderBrush="{DynamicResource StrongStrokeBrush}" BorderThickness="1" />
-                                    <TextBlock Text="{Binding GraphColorText}" VerticalAlignment="Center" Margin="8,0,0,0"
-                                               TextTrimming="CharacterEllipsis" MaxWidth="180" />
-                                </StackPanel>
-                            </Grid>
-                            <CheckBox Content="Use Windows accent color" IsChecked="{Binding UseWindowsAccent}" Margin="0,6,0,0"
-                                      ToolTip="Follow the Windows accent color (Settings → Personalization → Colors)" />
-                            <Popup x:Name="ColorPopup" IsOpen="{Binding IsColorPickerOpen}" PlacementTarget="{Binding ElementName=ColorButton}"
-                                   Placement="Bottom" VerticalOffset="4" StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade">
-                                <Border Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource StrokeBrush}"
-                                        BorderThickness="1" CornerRadius="8" Padding="8">
-                                    <ListBox ItemsSource="{Binding ColorSwatches}" SelectedItem="{Binding SelectedSwatch}"
-                                             HorizontalAlignment="Left" BorderThickness="0" Background="Transparent" Padding="0"
-                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled"
-                                             AutomationProperties.Name="Graph color">
-                                        <ListBox.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <UniformGrid Columns="{Binding ColorColumns}" />
-                                            </ItemsPanelTemplate>
-                                        </ListBox.ItemsPanel>
-                                        <ListBox.ItemContainerStyle>
-                                            <Style TargetType="ListBoxItem">
-                                                <Setter Property="Margin" Value="1" />
-                                                <Setter Property="Cursor" Value="Hand" />
-                                                <Setter Property="ToolTip" Value="{Binding Hex}" />
-                                                <Setter Property="AutomationProperties.Name" Value="{Binding Hex}" />
-                                                <Setter Property="Template">
-                                                    <Setter.Value>
-                                                        <!-- 칸 하나: 고른 칸은 테두리 링, 마우스를 올리면 옅은 링 -->
-                                                        <ControlTemplate TargetType="ListBoxItem">
-                                                            <Border x:Name="Ring" Width="23" Height="23" CornerRadius="5" Padding="2"
-                                                                    BorderThickness="2" BorderBrush="Transparent" Background="Transparent">
-                                                                <Border CornerRadius="3" Background="{Binding Brush}" />
-                                                            </Border>
-                                                            <ControlTemplate.Triggers>
-                                                                <Trigger Property="IsMouseOver" Value="True">
-                                                                    <Setter TargetName="Ring" Property="BorderBrush" Value="{DynamicResource StrongStrokeBrush}" />
-                                                                </Trigger>
-                                                                <Trigger Property="IsSelected" Value="True">
-                                                                    <Setter TargetName="Ring" Property="BorderBrush" Value="{DynamicResource TextBrush}" />
-                                                                </Trigger>
-                                                            </ControlTemplate.Triggers>
-                                                        </ControlTemplate>
-                                                    </Setter.Value>
-                                                </Setter>
-                                            </Style>
-                                        </ListBox.ItemContainerStyle>
-                                    </ListBox>
-                                </Border>
-                            </Popup>
+                            <ContentControl Content="{Binding GraphColor}" Focusable="False" HorizontalAlignment="Left" />
                         </StackPanel>
                         </ScrollViewer>
                     </Border>
@@ -512,309 +531,57 @@
                 </Grid>
             </TabItem>
 
-            <!-- ===== 작업표시줄 / 시작 메뉴 (Windhawk 테마) ===== -->
-            <TabItem Header="Themes">
-                <Grid DataContext="{Binding Shell}">
+            <!-- ===== 음악 위젯 ===== -->
+            <TabItem Header="Media widget">
+                <Grid DataContext="{Binding Media}">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="300" />
+                        <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="16" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
-                    <!-- 왼쪽: 가져오기 + 보관함 -->
+                    <!-- 왼쪽: 표시 / 음량 / 찾은 플레이어 -->
                     <Border Style="{StaticResource Card}">
-                        <DockPanel>
-                            <StackPanel DockPanel.Dock="Top">
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                    <TextBlock Text="Import a theme" Style="{StaticResource SectionTitle}" Margin="0" VerticalAlignment="Center" />
-                                    <!-- 정보 아이콘: 마우스를 올리면 가져올 수 있는 파일 안내 -->
-                                    <Border Width="16" Height="16" CornerRadius="8" Margin="6,1,0,0" VerticalAlignment="Center"
-                                            BorderThickness="1.2" BorderBrush="{DynamicResource SubtleTextBrush}" Background="Transparent"
-                                            Cursor="Help" ToolTipService.InitialShowDelay="100" ToolTipService.ShowDuration="30000">
-                                        <TextBlock Text="i" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource SubtleTextBrush}"
-                                                   HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-1,0,0" />
-                                        <Border.ToolTip>
-                                            <ToolTip MaxWidth="300">
-                                                <StackPanel>
-                                                    <TextBlock Text="Only theme setting files can be imported" FontWeight="SemiBold" Margin="0,0,0,4" />
-                                                    <TextBlock TextWrapping="Wrap" FontSize="11.5">
-                                                        <Run Text="• Windhawk style settings (.json) for the Windows 11 Taskbar / Start menu / Notification center stylers and Resource Redirect" /><LineBreak />
-                                                        <Run Text="• Windows Terminal settings.json or a color scheme (.json)" /><LineBreak />
-                                                        <Run Text="• Discord themes (.theme.css, or a theme file in a Discord folder)" /><LineBreak />
-                                                        <Run Text="• Komorebi komorebi.json (+ whkdrc)" /><LineBreak />
-                                                        <Run Text="• YASB config.yaml + styles.css" /><LineBreak />
-                                                        <Run Text="• Wallpapers inside a theme package" />
-                                                    </TextBlock>
-                                                    <TextBlock TextWrapping="Wrap" FontSize="11" Margin="0,6,0,0" Opacity="0.75"
-                                                               Text="Accepted as a GitHub link, .zip, folder, .json or .css. Anything else is rejected as an invalid file format." />
-                                                </StackPanel>
-                                            </ToolTip>
-                                        </Border.ToolTip>
-                                    </Border>
-                                </StackPanel>
-                                <TextBox Text="{Binding ImportText, UpdateSourceTrigger=PropertyChanged}"
-                                         ToolTip="GitHub repo link, .zip link, or a local .zip / .json / .css / folder path" />
-                                <TextBlock Style="{StaticResource Hint}" Margin="0,4,0,8"
-                                           Text="Paste a GitHub link or a .zip link, or browse a local file." />
-                                <UniformGrid Columns="3">
-                                    <Button Content="Import" Style="{StaticResource PrimaryButton}" Command="{Binding ImportCommand}" Margin="0,0,4,0" Padding="6,6" />
-                                    <Button Content="File…" Command="{Binding BrowseFileCommand}" Margin="2,0" Padding="6,6" />
-                                    <Button Content="Folder…" Command="{Binding BrowseFolderCommand}" Margin="4,0,0,0" Padding="6,6" />
-                                </UniformGrid>
-                                <Button Content="Find themes online ↗" Style="{StaticResource LinkButton}" Command="{Binding BrowseOnlineCommand}"
-                                        HorizontalAlignment="Left" Margin="0,8,0,0" />
-                                <DockPanel Margin="0,16,0,6">
-                                    <Button DockPanel.Dock="Right" Content="↻" Command="{Binding RefreshCommand}" Padding="8,2" Margin="0"
-                                            ToolTip="Refresh Windhawk status and library" />
-                                    <Button DockPanel.Dock="Right" Content="Reset" Command="{Binding ResetToOriginalCommand}" Padding="8,2" Margin="0,0,6,0"
-                                            ToolTipService.ShowOnDisabled="True">
-                                        <Button.ToolTip>
-                                            <ToolTip>
-                                                <TextBlock>
-                                                    <Run FontWeight="SemiBold" Text="Reset to original" /><LineBreak />
-                                                    <Run Text="Go back to how Windows looked before any library theme was applied" /><LineBreak />
-                                                    <Run Text="(taskbar, Start menu, Terminal, Discord, wallpaper)." /><LineBreak />
-                                                    <Run Text="Available after you apply a theme." Foreground="{DynamicResource SubtleTextBrush}" />
-                                                </TextBlock>
-                                            </ToolTip>
-                                        </Button.ToolTip>
-                                    </Button>
-                                    <TextBlock Text="Library" Style="{StaticResource SectionTitle}" Margin="0" VerticalAlignment="Center" />
-                                </DockPanel>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel Margin="0,0,10,0">
+                                <TextBlock Text="Display" Style="{StaticResource SectionTitle}" />
+                                <CheckBox Content="Show media widget" IsChecked="{Binding IsShown}" />
+                                <CheckBox Content="Move &amp; resize" IsChecked="{Binding EditMode}" />
+                                <TextBlock Style="{StaticResource Hint}" Margin="0,4,0,0"
+                                           Text="Shows what's playing and lets you play or pause, skip and change the volume. Scroll over the widget to change the volume. Turn on Move &amp; resize to drag it around or drag an edge to resize it." />
+
+                                <TextBlock Text="Volume slider changes" Style="{StaticResource SectionTitle}" Margin="0,16,0,6" />
+                                <ComboBox ItemsSource="{Binding VolumeTargets}" SelectedIndex="{Binding VolumeTargetIndex}"
+                                          HorizontalAlignment="Left" MinWidth="220" />
+                                <TextBlock Style="{StaticResource Hint}" Margin="0,4,0,0"
+                                           Text="App volume is the app's own level in the Windows volume mixer, so other sounds stay as they are. For YouTube in a browser, it changes the whole browser." />
+
+                                <TextBlock Text="Players found" Style="{StaticResource SectionTitle}" Margin="0,16,0,6" />
+                                <TextBlock Text="{Binding PlayersText}" TextWrapping="Wrap" FontWeight="Normal" FontSize="12.5"
+                                           Foreground="{DynamicResource TextBrush}" />
+                                <TextBlock Style="{StaticResource Hint}" Margin="0,6,0,0"
+                                           Text="Works with Spotify, YouTube and YouTube Music in your browser, the YouTube Music app and other players that show up in the Windows volume flyout. If more than one is open, click the app name on the widget to switch." />
                             </StackPanel>
-                            <Grid>
-                                <ListBox ItemsSource="{Binding Themes}" SelectedItem="{Binding SelectedTheme}"
-                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                                    <ListBox.ItemTemplate>
-                                        <DataTemplate DataType="{x:Type vm:ThemeListItem}">
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="Auto" />
-                                                </Grid.ColumnDefinitions>
-                                                <StackPanel>
-                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                                    <TextBlock Text="{Binding PartsText}" Style="{StaticResource Hint}" FontSize="11" Margin="0,3,0,0" />
-                                                </StackPanel>
-                                                <TextBlock Grid.Column="1" Text="{Binding ImportedText}" FontSize="11" Margin="8,2,0,0"
-                                                           Foreground="{DynamicResource SubtleTextBrush}" VerticalAlignment="Top" />
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ListBox.ItemTemplate>
-                                </ListBox>
-                                <TextBlock Text="No themes yet.&#x0a;Import one above." TextAlignment="Center"
-                                           HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock" BasedOn="{StaticResource Hint}">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding Themes.Count}" Value="0">
-                                                    <Setter Property="Visibility" Value="Visible" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                            </Grid>
-                        </DockPanel>
+                        </ScrollViewer>
                     </Border>
 
-                    <!-- 오른쪽: Windhawk 상태 + 선택한 테마 -->
+                    <!-- 오른쪽: 모양 -->
                     <Border Grid.Column="2" Style="{StaticResource Card}">
-                        <DockPanel>
-                            <!-- Windhawk 상태 -->
-                            <Border DockPanel.Dock="Top" CornerRadius="6" Padding="10,8" Margin="0,0,0,12" Background="{DynamicResource HoverBrush}">
-                                <DockPanel>
-                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Button Content="Get Windhawk ↗" Style="{StaticResource LinkButton}" Command="{Binding GetWindhawkCommand}" Margin="8,0,0,0" />
-                                        <Button Content="Locate…" Style="{StaticResource LinkButton}" Command="{Binding LocateWindhawkCommand}" Margin="10,0,0,0"
-                                                ToolTip="Pick the Windhawk folder if it was not detected" />
-                                    </StackPanel>
-                                    <Ellipse Width="8" Height="8" Margin="0,0,8,0" VerticalAlignment="Center">
-                                        <Ellipse.Style>
-                                            <Style TargetType="Ellipse">
-                                                <Setter Property="Fill" Value="{DynamicResource DangerBrush}" />
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsWindhawkInstalled}" Value="True">
-                                                        <Setter Property="Fill" Value="#22C55E" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Ellipse.Style>
-                                    </Ellipse>
-                                    <TextBlock Text="{Binding WindhawkStatus}" TextWrapping="Wrap" FontSize="12" VerticalAlignment="Center" />
-                                </DockPanel>
-                            </Border>
+                        <StackPanel>
+                            <TextBlock Text="Style" Style="{StaticResource SectionTitle}" Margin="0,0,0,8" />
+                            <ComboBox ItemsSource="{Binding Styles}" SelectedItem="{Binding Style}" Width="160" HorizontalAlignment="Left" />
 
-                            <!-- 버튼 + 상태 메시지 -->
-                            <StackPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
-                                <ScrollViewer MaxHeight="72" Margin="0,0,0,8" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <TextBlock Text="{Binding Status}" Style="{StaticResource Hint}" TextWrapping="Wrap" />
-                                </ScrollViewer>
-                                <UniformGrid Columns="4">
-                                    <UniformGrid.Resources>
-                                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-                                            <Setter Property="Height" Value="34" />
-                                            <Setter Property="Padding" Value="6,0" />
-                                            <Setter Property="Margin" Value="0,0,6,0" />
-                                        </Style>
-                                    </UniformGrid.Resources>
-                                    <Button Content="Apply" Style="{StaticResource PrimaryButton}" Command="{Binding ApplyCommand}" Height="34" Margin="0,0,6,0" />
-                                    <Button Content="Restore" Command="{Binding RestoreCommand}"
-                                            ToolTip="{Binding BackupLabel, FallbackValue='No backup yet', TargetNullValue='No backup yet'}" />
-                                    <Button Content="Folder" Command="{Binding OpenThemeFolderCommand}" />
-                                    <Button Content="Delete" Style="{StaticResource DangerButton}" Command="{Binding DeleteThemeCommand}" Height="34" Margin="0" />
-                                </UniformGrid>
-                            </StackPanel>
+                            <TextBlock Margin="0,12,0,2" Style="{StaticResource Hint}">
+                                <Run Text="Background opacity" /> <Run Text="{Binding WidgetOpacity, StringFormat=P0, Mode=OneWay}" />
+                            </TextBlock>
+                            <Slider Minimum="0" Maximum="1" Value="{Binding WidgetOpacity}" SmallChange="0.05" LargeChange="0.1" />
 
-                            <Grid>
-                                <TextBlock VerticalAlignment="Center" TextAlignment="Center"
-                                           Text="Import a theme or pick one from the library.&#x0a;Supported: Windhawk taskbar / Start menu styles,&#x0a;Windows Terminal color schemes and Discord themes&#x0a;(like the Gruvbox Material pack).">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock" BasedOn="{StaticResource Hint}">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding HasSelection}" Value="False">
-                                                    <Setter Property="Visibility" Value="Visible" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
+                            <TextBlock Margin="0,14,0,2" Style="{StaticResource Hint}" Text="Button &amp; bar color (play button, time bar, volume)" />
+                            <ContentControl Content="{Binding ButtonColor}" Focusable="False" HorizontalAlignment="Left" />
 
-                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
-                                              Visibility="{Binding HasSelection, Converter={StaticResource BoolToVisibility}}">
-                                    <StackPanel Margin="0,0,10,0">
-                                        <TextBlock Text="{Binding SelectedTheme.Name}" Style="{StaticResource SectionTitle}" Margin="0,0,0,2" />
-                                        <TextBlock Text="{Binding SelectedTheme.Package.Description}" Style="{StaticResource Hint}" />
-                                        <TextBlock Text="{Binding SelectedTheme.Package.Source}" Style="{StaticResource Hint}" FontSize="11"
-                                                   TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" Margin="0,2,0,10"
-                                                   ToolTip="{Binding SelectedTheme.Package.Source}" />
-
-                                        <TextBlock Text="Taskbar &amp; Start (Windhawk)" Margin="0,0,0,2">
-                                            <TextBlock.Style>
-                                                <Style TargetType="TextBlock" BasedOn="{StaticResource Hint}">
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding ModRows.Count}" Value="0">
-                                                            <Setter Property="Visibility" Value="Collapsed" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </TextBlock.Style>
-                                        </TextBlock>
-                                        <ItemsControl ItemsSource="{Binding ModRows}">
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate DataType="{x:Type vm:ThemeModRow}">
-                                                    <DockPanel Margin="0,3">
-                                                        <Button DockPanel.Dock="Right" Content="Install mod ↗" Style="{StaticResource LinkButton}"
-                                                                Command="{Binding DataContext.InstallModCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                                                CommandParameter="{Binding}" VerticalAlignment="Center"
-                                                                Visibility="{Binding IsInstalled, Converter={StaticResource InverseBoolToVisibility}}" />
-                                                        <CheckBox IsChecked="{Binding IsSelected}" IsEnabled="{Binding IsInstalled}" Margin="0">
-                                                            <StackPanel Orientation="Horizontal">
-                                                                <TextBlock Text="{Binding Name}" />
-                                                                <TextBlock Text="{Binding StateText}" Foreground="{DynamicResource SubtleTextBrush}" FontSize="11"
-                                                                           Margin="8,1,0,0" VerticalAlignment="Center" />
-                                                            </StackPanel>
-                                                        </CheckBox>
-                                                    </DockPanel>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-
-                                        <!-- 앱 테마 (Windows Terminal / Discord / Komorebi / YASB) -->
-                                        <StackPanel Margin="0,10,0,0">
-                                            <StackPanel.Style>
-                                                <Style TargetType="StackPanel">
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding AppRows.Count}" Value="0">
-                                                            <Setter Property="Visibility" Value="Collapsed" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </StackPanel.Style>
-                                            <TextBlock Text="Apps" Style="{StaticResource Hint}" Margin="0,0,0,2" />
-                                            <ItemsControl ItemsSource="{Binding AppRows}">
-                                                <ItemsControl.ItemTemplate>
-                                                    <DataTemplate DataType="{x:Type vm:ThemeAppRow}">
-                                                        <StackPanel Margin="0,3" ToolTip="{Binding ToolTip}">
-                                                            <DockPanel>
-                                                                <Button DockPanel.Dock="Right" Content="{Binding GetLinkText}" Style="{StaticResource LinkButton}"
-                                                                        Command="{Binding DataContext.GetAppCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                                                        CommandParameter="{Binding}" VerticalAlignment="Center"
-                                                                        Visibility="{Binding IsAvailable, Converter={StaticResource InverseBoolToVisibility}}" />
-                                                                <CheckBox IsChecked="{Binding IsSelected}" IsEnabled="{Binding IsAvailable}" Margin="0">
-                                                                    <StackPanel Orientation="Horizontal">
-                                                                        <TextBlock Text="{Binding Name}" />
-                                                                        <TextBlock Text="{Binding StateText}" Foreground="{DynamicResource SubtleTextBrush}" FontSize="11"
-                                                                                   Margin="8,1,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                                                                    </StackPanel>
-                                                                </CheckBox>
-                                                            </DockPanel>
-                                                            <!-- 패키지에 이 앱용 테마가 여러 개면 고르기 -->
-                                                            <ComboBox ItemsSource="{Binding Variants}" SelectedItem="{Binding SelectedVariant}"
-                                                                      Margin="26,4,0,2" MinWidth="220" HorizontalAlignment="Left"
-                                                                      IsEnabled="{Binding IsSelected}"
-                                                                      Visibility="{Binding HasVariants, Converter={StaticResource BoolToVisibility}}" />
-                                                        </StackPanel>
-                                                    </DataTemplate>
-                                                </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
-                                        </StackPanel>
-
-                                        <!-- 임의 스크립트 경고 -->
-                                        <Border Margin="0,8,0,0" Padding="10,8" CornerRadius="6" BorderThickness="1"
-                                                BorderBrush="{DynamicResource DangerBrush}"
-                                                Visibility="{Binding HasCustomScript, Converter={StaticResource BoolToVisibility}}">
-                                            <CheckBox IsChecked="{Binding AllowCustomScript}" Margin="0">
-                                                <TextBlock TextWrapping="Wrap" FontSize="12"
-                                                           Text="This theme contains custom script that runs inside the Start menu. Allow it (only if you trust the source)." />
-                                            </CheckBox>
-                                        </Border>
-
-                                        <!-- 배경화면 -->
-                                        <StackPanel Margin="0,12,0,0">
-                                            <StackPanel.Style>
-                                                <Style TargetType="StackPanel">
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding SelectedTheme.Package.Wallpapers.Count}" Value="0">
-                                                            <Setter Property="Visibility" Value="Collapsed" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </StackPanel.Style>
-                                            <CheckBox Content="Also set wallpaper (click one below)" IsChecked="{Binding ApplyWallpaper}" />
-                                            <ListBox ItemsSource="{Binding Wallpapers}" SelectedItem="{Binding SelectedWallpaper}"
-                                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled" MaxHeight="210" Margin="0,4,0,0">
-                                                <ListBox.ItemsPanel>
-                                                    <ItemsPanelTemplate>
-                                                        <WrapPanel />
-                                                    </ItemsPanelTemplate>
-                                                </ListBox.ItemsPanel>
-                                                <ListBox.ItemContainerStyle>
-                                                    <Style TargetType="ListBoxItem" BasedOn="{StaticResource CleanListItem}">
-                                                        <Setter Property="Padding" Value="0" />
-                                                    </Style>
-                                                </ListBox.ItemContainerStyle>
-                                                <ListBox.ItemTemplate>
-                                                    <DataTemplate DataType="{x:Type vm:WallpaperThumb}">
-                                                        <Border Width="104" Height="58" CornerRadius="4" ClipToBounds="True" ToolTip="{Binding Name}"
-                                                                Background="{DynamicResource StrokeBrush}">
-                                                            <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" />
-                                                        </Border>
-                                                    </DataTemplate>
-                                                </ListBox.ItemTemplate>
-                                            </ListBox>
-                                        </StackPanel>
-
-                                        <TextBlock Style="{StaticResource Hint}" Margin="0,10,0,0" FontSize="11"
-                                                   Visibility="{Binding OtherItemsText, Converter={StaticResource NullToVisible}, ConverterParameter=invert}">
-                                            <Run Text="Not applied (settings for other apps):" /> <Run Text="{Binding OtherItemsText, Mode=OneWay}" />
-                                        </TextBlock>
-                                    </StackPanel>
-                                </ScrollViewer>
-                            </Grid>
-                        </DockPanel>
+                            <TextBlock Style="{StaticResource Hint}" Margin="0,16,0,0"
+                                       Text="Presets save the media widget too (shown or hidden, position, size, style, color)." />
+                        </StackPanel>
                     </Border>
                 </Grid>
             </TabItem>

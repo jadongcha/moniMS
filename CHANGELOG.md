@@ -6,6 +6,20 @@ Write upcoming changes under **[Unreleased]**; `release.ps1` moves them into the
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-14
+
+### Added
+- **Media widget**: see what's playing in Spotify, YouTube or YouTube Music (in your browser or the app) and control it from your desktop: previous, play/pause, next and volume. It shows the album art, title, artist and how far into the song you are.
+  - Click or drag the time bar to jump to any point in the song or video (when the app allows it, as YouTube and Spotify do).
+  - Pick the color of the play button, time bar and volume bar from a color table in **Settings → Media widget**, or keep the Windows accent color.
+  - The volume slider changes only the playing app's volume, so other sounds stay as they are. You can switch it to the Windows volume in **Settings → Media widget**. Click the speaker to mute, or scroll over the widget.
+  - With more than one player open, it shows the one you started last. Click the app name on the widget to switch.
+  - Turn it on in the new **Settings → Media widget** tab or with **Show media widget** in the tray menu. Move & resize and the Dark, Light and Glass styles work like the other widgets.
+- Presets can save the media widget too (shown or hidden, position, size, style, color). Overwriting a preset made with an earlier version adds the media widget to it.
+
+### Removed
+- The **Themes** tab, which imported themes and applied them to the taskbar, Start menu, Windows Terminal, Discord, Komorebi and YASB. Anything a theme already changed stays as it is. To undo it, press **Reset** in **Settings → Themes** before you update, or change it back in each app. Imported themes are left in `%APPDATA%\MoniMS\themes`, and you can delete that folder.
+
 ## [0.4.2] - 2026-10-13
 
 ### Changes

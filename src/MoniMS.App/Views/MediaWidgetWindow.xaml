@@ -1,0 +1,308 @@
+<Window x:Class="MoniMS.App.Views.MediaWidgetWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="MoniMS Media Widget"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ShowInTaskbar="False" ShowActivated="False" ResizeMode="NoResize" Topmost="False"
+        Width="360" Height="160" MinWidth="260" MinHeight="130"
+        UseLayoutRounding="True" TextOptions.TextFormattingMode="Display"
+        FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="12.5">
+
+    <Window.Resources>
+        <!-- 아래 브러시는 코드에서 스타일(Dark/Light/Glass)에 맞게 교체된다 (MediaWidgetWindow.ApplyStyle) -->
+        <SolidColorBrush x:Key="MwBackground" Color="#EB1F2023" />
+        <SolidColorBrush x:Key="MwBorder" Color="#33FFFFFF" />
+        <SolidColorBrush x:Key="MwText" Color="#F3F4F6" />
+        <SolidColorBrush x:Key="MwSubtle" Color="#9AA1AC" />
+        <SolidColorBrush x:Key="MwHover" Color="#12FFFFFF" />
+        <SolidColorBrush x:Key="MwPressed" Color="#20FFFFFF" />
+        <SolidColorBrush x:Key="MwTrack" Color="#33FFFFFF" />
+        <SolidColorBrush x:Key="MwArtBackground" Color="#12FFFFFF" />
+        <SolidColorBrush x:Key="MwAccent" Color="#60A5FA" />
+        <SolidColorBrush x:Key="MwOnAccent" Color="#FFFFFF" />
+
+        <FontFamily x:Key="MwIconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
+
+        <!-- 이전 / 다음 / 스피커 -->
+        <Style x:Key="MwIconButton" TargetType="Button">
+            <Setter Property="Width" Value="32" />
+            <Setter Property="Height" Value="32" />
+            <Setter Property="Foreground" Value="{DynamicResource MwText}" />
+            <Setter Property="FontFamily" Value="{StaticResource MwIconFont}" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="Transparent" CornerRadius="16">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource MwHover}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource MwPressed}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.35" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 재생 / 일시 정지: 강조색 동그라미 -->
+        <Style x:Key="MwPlayButton" TargetType="Button" BasedOn="{StaticResource MwIconButton}">
+            <Setter Property="Width" Value="36" />
+            <Setter Property="Height" Value="36" />
+            <Setter Property="Margin" Value="4,0" />
+            <Setter Property="Foreground" Value="{DynamicResource MwOnAccent}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid>
+                            <Ellipse x:Name="Bg" Fill="{DynamicResource MwAccent}" />
+                            <Ellipse x:Name="Shade" Fill="Black" Opacity="0" />
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Shade" Property="Opacity" Value="0.12" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Shade" Property="Opacity" Value="0.25" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.35" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 앱 이름: 여러 앱이 있으면 눌러서 다음 앱으로. 하나뿐이면 그냥 글자처럼 보인다. -->
+        <Style x:Key="MwChipButton" TargetType="Button">
+            <Setter Property="Foreground" Value="{DynamicResource MwSubtle}" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Padding" Value="6,2" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="Transparent" CornerRadius="4" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource MwHover}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Background" Value="Transparent" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 음량 막대 -->
+        <Style x:Key="MwSliderFill" TargetType="RepeatButton">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="IsTabStop" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RepeatButton">
+                        <Border Height="4" CornerRadius="2" Background="{TemplateBinding Background}" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="MwSliderThumb" TargetType="Thumb">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Thumb">
+                        <Grid Width="14" Height="14" Background="Transparent">
+                            <Ellipse Fill="{DynamicResource MwAccent}" Stroke="{DynamicResource MwOnAccent}" StrokeThickness="2" />
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="MwSlider" TargetType="Slider">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="IsMoveToPointEnabled" Value="True" />
+            <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Grid x:Name="Root" Height="24" Background="Transparent">
+                            <Border Height="4" CornerRadius="2" Background="{DynamicResource MwTrack}" VerticalAlignment="Center" />
+                            <Track x:Name="PART_Track" VerticalAlignment="Center">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="Slider.DecreaseLarge" Style="{StaticResource MwSliderFill}"
+                                                  Background="{DynamicResource MwAccent}" />
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="Slider.IncreaseLarge" Style="{StaticResource MwSliderFill}" Background="Transparent" />
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Style="{StaticResource MwSliderThumb}" />
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Root" Property="Opacity" Value="0.35" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 시간 막대: 누르거나 동그라미를 끌어 곡의 원하는 위치로. 동그라미는 마우스를 올렸을 때만 보인다.
+             앱이 위치 옮기기를 허락하지 않으면 진행만 보여 준다 (흐려지지 않음). -->
+        <Style x:Key="MwSeekSlider" TargetType="Slider">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="IsMoveToPointEnabled" Value="True" />
+            <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Grid Height="16" Background="Transparent">
+                            <Border Height="4" CornerRadius="2" Background="{DynamicResource MwTrack}" VerticalAlignment="Center" />
+                            <Track x:Name="PART_Track" VerticalAlignment="Center">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="Slider.DecreaseLarge" Style="{StaticResource MwSliderFill}"
+                                                  Background="{DynamicResource MwAccent}" />
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="Slider.IncreaseLarge" Style="{StaticResource MwSliderFill}" Background="Transparent" />
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb x:Name="Thumb" Style="{StaticResource MwSliderThumb}" Opacity="0" />
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Thumb" Property="Opacity" Value="1" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Thumb" Property="Visibility" Value="Hidden" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Border CornerRadius="10" Background="{DynamicResource MwBackground}" BorderBrush="{DynamicResource MwBorder}"
+                BorderThickness="1" Padding="12,12,12,8">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- 앨범 아트: 이 줄의 높이에 맞춘 정사각형 -->
+                <Border x:Name="ArtBox" CornerRadius="6" Margin="0,0,12,0" Background="{DynamicResource MwArtBackground}"
+                        Width="{Binding ActualHeight, RelativeSource={RelativeSource Self}}" MaxHeight="160">
+                    <Grid>
+                        <TextBlock Text="&#xE8D6;" FontFamily="{StaticResource MwIconFont}" FontSize="22"
+                                   Foreground="{DynamicResource MwSubtle}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Visibility="{Binding Art, Converter={StaticResource NullToVisible}}" />
+                        <Border CornerRadius="6">
+                            <Border.Background>
+                                <ImageBrush ImageSource="{Binding Art}" Stretch="UniformToFill" />
+                            </Border.Background>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <!-- 곡 정보 -->
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Title}" ToolTip="{Binding Title}" FontSize="14" FontWeight="SemiBold"
+                               Foreground="{DynamicResource MwText}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding Subtitle}" ToolTip="{Binding Subtitle}" FontSize="12" Margin="0,2,0,0"
+                               Foreground="{DynamicResource MwSubtle}" TextTrimming="CharacterEllipsis" />
+                    <Button Style="{StaticResource MwChipButton}" HorizontalAlignment="Left" Margin="-6,4,0,0"
+                            Command="{Binding SwitchSessionCommand}" IsEnabled="{Binding CanSwitch}" ToolTip="{Binding SwitchToolTip}"
+                            AutomationProperties.Name="Switch player"
+                            Visibility="{Binding HasMedia, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding AppName}" FontSize="11" />
+                            <TextBlock Text="&#xE8AB;" FontFamily="{StaticResource MwIconFont}" FontSize="10" Margin="6,1,0,0"
+                                       Visibility="{Binding CanSwitch, Converter={StaticResource BoolToVisibility}}" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+
+                <!-- 시간 막대 (앱이 곡 길이를 알려 줄 때만) -->
+                <Grid Grid.Row="1" Grid.ColumnSpan="2" Margin="0,8,0,0"
+                      Visibility="{Binding HasTimeline, Converter={StaticResource BoolToVisibility}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding PositionText}" FontSize="11" Foreground="{DynamicResource MwSubtle}" MinWidth="30" />
+                    <Slider x:Name="SeekBar" Grid.Column="1" Style="{StaticResource MwSeekSlider}" Margin="8,0"
+                            Minimum="0" Maximum="1" Value="{Binding Progress}" VerticalAlignment="Center"
+                            IsEnabled="{Binding CanSeek}" ToolTip="{Binding SeekToolTip}" AutomationProperties.Name="Position" />
+                    <TextBlock Grid.Column="2" Text="{Binding DurationText}" FontSize="11" Foreground="{DynamicResource MwSubtle}"
+                               MinWidth="30" TextAlignment="Right" />
+                </Grid>
+
+                <!-- 재생 조작 + 음량 -->
+                <Grid Grid.Row="2" Grid.ColumnSpan="2" Margin="0,6,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Orientation="Horizontal">
+                        <Button Style="{StaticResource MwIconButton}" Content="&#xE892;" ToolTip="Previous"
+                                Command="{Binding PreviousCommand}" IsEnabled="{Binding CanPrevious}"
+                                AutomationProperties.Name="Previous" />
+                        <Button Style="{StaticResource MwPlayButton}" Content="{Binding PlayPauseGlyph}" ToolTip="{Binding PlayPauseToolTip}"
+                                Command="{Binding PlayPauseCommand}" IsEnabled="{Binding CanPlayPause}"
+                                AutomationProperties.Name="{Binding PlayPauseToolTip}" />
+                        <Button Style="{StaticResource MwIconButton}" Content="&#xE893;" ToolTip="Next"
+                                Command="{Binding NextCommand}" IsEnabled="{Binding CanNext}"
+                                AutomationProperties.Name="Next" />
+                    </StackPanel>
+                    <Button Grid.Column="2" Style="{StaticResource MwIconButton}" Content="{Binding VolumeGlyph}"
+                            ToolTip="{Binding VolumeToolTip}" Command="{Binding ToggleMuteCommand}" IsEnabled="{Binding VolumeAvailable}"
+                            AutomationProperties.Name="Mute" />
+                    <Slider Grid.Column="3" Style="{StaticResource MwSlider}" Minimum="0" Maximum="100" Margin="2,0,4,0"
+                            VerticalAlignment="Center" Value="{Binding VolumeLevel}" IsEnabled="{Binding VolumeAvailable}"
+                            ToolTip="{Binding VolumeToolTip}" AutomationProperties.Name="Volume" />
+                </Grid>
+            </Grid>
+        </Border>
+
+        <!-- 편집 모드: 옅은 덮개 + 테두리 + 안내 (덮개가 버튼을 가려서 어디를 잡아도 끌린다) -->
+        <Grid x:Name="EditOverlay" Visibility="Collapsed" Background="#33000000">
+            <Border CornerRadius="10" BorderThickness="2" BorderBrush="{DynamicResource MwAccent}" />
+            <Border VerticalAlignment="Top" HorizontalAlignment="Center" Margin="8,8,8,0" Background="{DynamicResource MwAccent}"
+                    CornerRadius="8" Padding="8,2">
+                <TextBlock Text="Drag to move · drag edges to resize" FontSize="11" Foreground="White" TextTrimming="CharacterEllipsis" />
+            </Border>
+            <Path Data="M 14,0 L 14,14 L 0,14 Z" Fill="{DynamicResource MwAccent}"
+                  HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,4,4" />
+        </Grid>
+    </Grid>
+</Window>

@@ -99,7 +99,6 @@ public sealed class ImageWidgetTests : IDisposable
         }
 
         public void Apply(WallpaperSettings s, string dir) { }
-        public void SetForAllMonitors(string imagePath, WallpaperPosition position) { }
     }
 
     private sealed class NoTheme : IThemeService

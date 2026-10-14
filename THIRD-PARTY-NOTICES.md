@@ -9,9 +9,5 @@ MoniMS includes or depends on the following third-party components.
 | [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet) | MIT | MVVM helpers. |
 | [Microsoft.Extensions.DependencyInjection / Logging](https://github.com/dotnet/runtime) | MIT | Dependency injection and logging. |
 | [System.Diagnostics.PerformanceCounter](https://github.com/dotnet/runtime) | MIT | Performance information. |
+| [C#/WinRT](https://github.com/microsoft/CsWinRT) (Microsoft.Windows.CsWinRT, WinRT.Runtime) | MIT | Calls the Windows media controls for the media widget. |
 | [.NET](https://github.com/dotnet/runtime) / [WPF](https://github.com/dotnet/wpf) | MIT | Runtime and UI framework (installed separately). |
-
-## Not included
-
-- **[Windhawk](https://windhawk.net)** and its mods are **not** bundled or redistributed. MoniMS only writes mod settings to an existing Windhawk installation that the user installed themselves.
-- Theme packages you import (wallpapers, style files) belong to their authors and keep their own licenses. They are stored only on your PC.

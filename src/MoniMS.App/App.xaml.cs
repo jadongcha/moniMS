@@ -9,9 +9,9 @@ using MoniMS.App.ViewModels;
 using MoniMS.App.Views;
 using MoniMS.Core;
 using MoniMS.Core.Desktop;
+using MoniMS.Core.Media;
 using MoniMS.Core.Presets;
 using MoniMS.Core.Settings;
-using MoniMS.Core.Shell;
 using MoniMS.Core.SystemInfo;
 
 namespace MoniMS.App;
@@ -31,13 +31,6 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
-        // 관리자 권한 헬퍼 모드: Windhawk 설정만 쓰고 바로 종료 (중복 실행 검사 전에 처리)
-        if (e.Args.Length >= 3 && e.Args[0] == ElevatedWindhawkWriter.HelperArgument)
-        {
-            Shutdown(ElevatedWindhawkWriter.RunHelper(e.Args));
-            return;
-        }
-
         // 중복 실행 방지: 같은 빌드가 이미 실행 중이면 그쪽 설정 창을 띄우고 종료.
         // 예전 빌드가 실행 중이면(업데이트 직후) 그걸 종료시키고 새 버전이 대신 실행된다.
         _mutex = new Mutex(initiallyOwned: true, MutexName, out var createdNew);
@@ -71,6 +64,7 @@ public partial class App : Application
         _services.GetRequiredService<WidgetController>().Initialize();
         _services.GetRequiredService<ImageWidgetController>().Initialize();
         _services.GetRequiredService<FileWidgetController>().Initialize();
+        _services.GetRequiredService<MediaWidgetController>().Initialize();
         _services.GetRequiredService<TrayIconService>().Show();
         ListenForActivation();
         ListenForExit();
@@ -98,10 +92,8 @@ public partial class App : Application
         services.AddSingleton<IDesktopIconService, DesktopIconService>();
         services.AddSingleton<ISystemMonitor, SystemMonitor>();
         services.AddSingleton<PresetService>();
-        services.AddSingleton<IWindhawkStorage, WindhawkStorage>();
-        services.AddSingleton<ThemeLibrary>(_ => new ThemeLibrary());
-        services.AddSingleton<ThemeImporter>(sp => new ThemeImporter(sp.GetRequiredService<ThemeLibrary>()));
-        services.AddSingleton<ThemeApplier>();
+        services.AddSingleton<MediaSessions>();
+        services.AddSingleton<AudioVolume>();
 
         // App
         services.AddSingleton<WidgetViewModel>();
@@ -116,11 +108,13 @@ public partial class App : Application
         services.AddSingleton<FileWidgetController>();
         services.AddSingleton<IFileWidgetHost>(sp => sp.GetRequiredService<FileWidgetController>());
         services.AddTransient<FileWidgetSettingsViewModel>();
+        services.AddSingleton<MediaWidgetViewModel>();
+        services.AddSingleton<MediaWidgetController>();
+        services.AddSingleton<IMediaWidgetHost>(sp => sp.GetRequiredService<MediaWidgetController>());
+        services.AddTransient<MediaWidgetSettingsViewModel>();
         services.AddSingleton<TrayIconService>();
         services.AddSingleton<WindowService>();
-        services.AddSingleton<IWindhawkSettingsWriter, ElevatedWindhawkWriter>();
         services.AddSingleton<UpdateService>();
-        services.AddTransient<ShellThemesViewModel>();
         services.AddTransient<ManagerViewModel>();
         services.AddTransient<ManagerWindow>();
 

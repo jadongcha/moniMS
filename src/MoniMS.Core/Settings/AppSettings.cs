@@ -19,13 +19,13 @@ public sealed class AppSettings
     /// <summary>현재 파일 위젯. 폴더를 하나 이상 고르기 전에는 창이 뜨지 않는다.</summary>
     public FileWidgetLayout FileWidget { get; set; } = new();
 
+    /// <summary>현재 음악 위젯. 처음에는 숨김.</summary>
+    public MediaWidgetLayout MediaWidget { get; set; } = new();
+
     public string? LastAppliedPresetId { get; set; }
 
     /// <summary>설정 창 테마.</summary>
     public UiTheme UiTheme { get; set; } = UiTheme.Light;
-
-    /// <summary>자동 감지가 안 될 때 사용자가 지정한 Windhawk 설치 폴더.</summary>
-    public string? WindhawkPath { get; set; }
 
     /// <summary>측정 주기(ms).</summary>
     public int RefreshIntervalMs { get; set; } = 1000;

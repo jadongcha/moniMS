@@ -8,9 +8,6 @@ public interface IWallpaperService
     WallpaperSettings Capture(string presetDirectory);
 
     void Apply(WallpaperSettings settings, string presetDirectory);
-
-    /// <summary>모든 모니터에 같은 이미지를 배경화면으로.</summary>
-    void SetForAllMonitors(string imagePath, WallpaperPosition position);
 }
 
 public interface IThemeService

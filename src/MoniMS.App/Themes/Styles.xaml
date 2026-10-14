@@ -89,25 +89,6 @@
         </Setter>
     </Style>
 
-    <!-- 링크처럼 보이는 버튼 -->
-    <Style x:Key="LinkButton" TargetType="Button">
-        <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
-        <Setter Property="Cursor" Value="Hand" />
-        <Setter Property="Padding" Value="0" />
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="Button">
-                    <TextBlock x:Name="T" Text="{TemplateBinding Content}" Foreground="{TemplateBinding Foreground}" />
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="T" Property="TextDecorations" Value="Underline" />
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
     <Style x:Key="DangerButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
         <Setter Property="Foreground" Value="{DynamicResource DangerBrush}" />
     </Style>

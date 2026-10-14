@@ -52,6 +52,14 @@ public sealed class PresetPreviewViewModel
     public double FilesWidth { get; private init; }
     public double FilesHeight { get; private init; }
     public Brush FilesBrush { get; private init; } = Brushes.Transparent;
+
+    /// <summary>음악 위젯 (보이지 않거나 저장 안 했으면 HasMedia = false).</summary>
+    public bool HasMedia { get; private init; }
+    public double MediaLeft { get; private init; }
+    public double MediaTop { get; private init; }
+    public double MediaWidth { get; private init; }
+    public double MediaHeight { get; private init; }
+    public Brush MediaBrush { get; private init; } = Brushes.Transparent;
     public Brush? AccentSwatch { get; private init; }
     public string AccentText { get; private init; } = "";
     public IReadOnlyList<PreviewRow> Rows { get; private init; } = [];
@@ -237,6 +245,41 @@ public sealed class PresetPreviewViewModel
             rows.Add(new PreviewRow("Files", "not saved"));
         }
 
+        // ----- 음악 위젯 -----
+        var hasMedia = false;
+        double mediaLeft = 0, mediaTop = 0, mediaWidth = 0, mediaHeight = 0;
+        Brush mediaBrush = Brushes.Transparent;
+        if (preset.MediaWidget is { } m)
+        {
+            hasMedia = m.Visible;
+            mediaWidth = m.Width * dpiScale;
+            mediaHeight = m.Height * dpiScale;
+            if (double.IsNaN(m.Left) || double.IsNaN(m.Top))
+            {
+                mediaLeft = width - mediaWidth - 24 * dpiScale; // 기본 위치: 오른쪽 아래 (작업표시줄 위)
+                mediaTop = height - 48 * dpiScale - mediaHeight - 24 * dpiScale;
+            }
+            else
+            {
+                mediaLeft = m.Left * dpiScale;
+                mediaTop = m.Top * dpiScale;
+            }
+            var (baseColor, baseAlpha) = m.Style switch
+            {
+                WidgetStyle.Light => (Color.FromRgb(0xF9, 0xFA, 0xFB), 1.0),
+                WidgetStyle.Glass => (Color.FromRgb(0, 0, 0), 0.4),
+                _ => (Color.FromRgb(0x1F, 0x20, 0x23), 1.0),
+            };
+            var alpha = Math.Max(0.25, baseAlpha * m.Opacity);
+            mediaBrush = Frozen(new SolidColorBrush(Color.FromArgb((byte)(alpha * 255), baseColor.R, baseColor.G, baseColor.B)));
+            var volume = m.VolumeTarget == MediaVolumeTarget.App ? "app volume" : "Windows volume";
+            rows.Add(new PreviewRow("Media", m.Visible ? $"{m.Style} · {m.Width:0}×{m.Height:0} · {volume}" : "hidden"));
+        }
+        else
+        {
+            rows.Add(new PreviewRow("Media", "not saved"));
+        }
+
         rows.Add(new PreviewRow("Saved", preset.UpdatedAt.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)));
 
         return new PresetPreviewViewModel(preset.Name)
@@ -266,6 +309,12 @@ public sealed class PresetPreviewViewModel
             FilesWidth = filesWidth,
             FilesHeight = filesHeight,
             FilesBrush = filesBrush,
+            HasMedia = hasMedia,
+            MediaLeft = mediaLeft,
+            MediaTop = mediaTop,
+            MediaWidth = mediaWidth,
+            MediaHeight = mediaHeight,
+            MediaBrush = mediaBrush,
             AccentSwatch = swatch,
             AccentText = accentText,
             Rows = rows,

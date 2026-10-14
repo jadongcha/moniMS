@@ -17,11 +17,12 @@ public sealed class PresetService
     private readonly IWidgetLayoutHost _widget;
     private readonly IImageWidgetHost? _imageWidget;
     private readonly IFileWidgetHost? _fileWidget;
+    private readonly IMediaWidgetHost? _mediaWidget;
     private readonly ILogger<PresetService> _logger;
 
     public PresetService(IPresetStore store, IWallpaperService wallpaper, IThemeService theme,
         IDesktopIconService icons, IWidgetLayoutHost widget, ILogger<PresetService>? logger = null,
-        IImageWidgetHost? imageWidget = null, IFileWidgetHost? fileWidget = null)
+        IImageWidgetHost? imageWidget = null, IFileWidgetHost? fileWidget = null, IMediaWidgetHost? mediaWidget = null)
     {
         _store = store;
         _wallpaper = wallpaper;
@@ -30,6 +31,7 @@ public sealed class PresetService
         _widget = widget;
         _imageWidget = imageWidget;
         _fileWidget = fileWidget;
+        _mediaWidget = mediaWidget;
         _logger = logger ?? NullLogger<PresetService>.Instance;
     }
 
@@ -73,6 +75,8 @@ public sealed class PresetService
             preset.ImageWidget = TryRun(() => CaptureImageWidget(dir), "Image widget");
         if (parts.HasFlag(PresetParts.FileWidget) && _fileWidget is not null)
             preset.FileWidget = _fileWidget.GetCurrentLayout().Clone();
+        if (parts.HasFlag(PresetParts.MediaWidget) && _mediaWidget is not null)
+            preset.MediaWidget = _mediaWidget.GetCurrentLayout().Clone();
 
         if (parts.HasFlag(PresetParts.Wallpaper) || parts.HasFlag(PresetParts.ImageWidget))
             RemoveUnreferencedImages(dir, preset);
@@ -209,6 +213,9 @@ public sealed class PresetService
         if (parts.HasFlag(PresetParts.FileWidget) && _fileWidget is not null &&
             Try(() => _fileWidget.ApplyLayout(ResolveFileWidget(preset, warnings)), "File widget", warnings))
             applied |= PresetParts.FileWidget;
+        if (parts.HasFlag(PresetParts.MediaWidget) && _mediaWidget is not null &&
+            Try(() => _mediaWidget.ApplyLayout(preset.MediaWidget!.Clone()), "Media widget", warnings))
+            applied |= PresetParts.MediaWidget;
         return applied;
     }
 

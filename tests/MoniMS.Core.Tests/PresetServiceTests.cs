@@ -18,7 +18,6 @@ public sealed class PresetServiceTests : IDisposable
 
         public void Apply(WallpaperSettings s, string dir) => calls.Add("wallpaper");
 
-        public void SetForAllMonitors(string imagePath, WallpaperPosition position) => calls.Add("wallpaper-all");
     }
 
     private sealed class FakeTheme(List<string> calls) : IThemeService

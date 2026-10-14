@@ -240,7 +240,6 @@ public sealed class FileWidgetTests : IDisposable
     {
         public WallpaperSettings Capture(string dir) => new();
         public void Apply(WallpaperSettings s, string dir) { }
-        public void SetForAllMonitors(string imagePath, WallpaperPosition position) { }
     }
 
     private sealed class NoTheme : IThemeService

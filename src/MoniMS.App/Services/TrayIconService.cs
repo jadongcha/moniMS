@@ -13,6 +13,7 @@ public sealed class TrayIconService : IDisposable
     private readonly WidgetController _widget;
     private readonly ImageWidgetController _imageWidget;
     private readonly FileWidgetController _fileWidget;
+    private readonly MediaWidgetController _mediaWidget;
     private readonly ISettingsStore _settings;
     private readonly WindowService _windows;
     private readonly ILogger<TrayIconService> _logger;
@@ -20,12 +21,14 @@ public sealed class TrayIconService : IDisposable
     private readonly WinForms.ContextMenuStrip _menu = new();
 
     public TrayIconService(PresetService presets, WidgetController widget, ImageWidgetController imageWidget,
-        FileWidgetController fileWidget, ISettingsStore settings, WindowService windows, ILogger<TrayIconService> logger)
+        FileWidgetController fileWidget, MediaWidgetController mediaWidget, ISettingsStore settings, WindowService windows,
+        ILogger<TrayIconService> logger)
     {
         _presets = presets;
         _widget = widget;
         _imageWidget = imageWidget;
         _fileWidget = fileWidget;
+        _mediaWidget = mediaWidget;
         _settings = settings;
         _windows = windows;
         _logger = logger;
@@ -137,8 +140,11 @@ public sealed class TrayIconService : IDisposable
         var showFiles = Toggle("Show file widget", files.HasFolders && files.Visible, v => _fileWidget.Update(l => l.Visible = v));
         showFiles.Enabled = files.HasFolders; // 폴더를 고르기 전에는 설정 창에서
         _menu.Items.Add(showFiles);
-        // 위젯을 모두 함께 편집 (사진·파일 위젯은 크기 조절도)
-        _menu.Items.Add(Toggle("Edit widgets (move && resize)", _widget.IsEditMode || _imageWidget.IsEditMode || _fileWidget.IsEditMode, v =>
+        var media = _mediaWidget.Layout;
+        _menu.Items.Add(Toggle("Show media widget", media.Visible, v => _mediaWidget.Update(l => l.Visible = v)));
+        // 위젯을 모두 함께 편집 (사진·파일·음악 위젯은 크기 조절도). 음악 위젯은 켜 둔 경우에만.
+        _menu.Items.Add(Toggle("Edit widgets (move && resize)",
+            _widget.IsEditMode || _imageWidget.IsEditMode || _fileWidget.IsEditMode || _mediaWidget.IsEditMode, v =>
         {
             if (v && !layout.Visible)
                 _widget.Update(l => l.Visible = true);
@@ -155,6 +161,8 @@ public sealed class TrayIconService : IDisposable
                     _fileWidget.Update(l => l.Visible = true);
                 _fileWidget.SetEditMode(v);
             }
+            if (media.Visible || !v)
+                _mediaWidget.SetEditMode(v);
         }));
         _menu.Items.Add(new WinForms.ToolStripSeparator());
 

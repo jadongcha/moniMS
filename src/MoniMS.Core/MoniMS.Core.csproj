@@ -4,9 +4,40 @@
     <RootNamespace>MoniMS.Core</RootNamespace>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
+  <!--
+    음악 위젯이 쓰는 Windows 미디어 제어(Windows.Media.Control) WinRT API.
+    Windows SDK 전체 투영(Microsoft.Windows.SDK.NET.dll, 약 25MB) 대신 필요한 형식만 C#/WinRT로 생성해 넣는다 (약 0.35MB).
+    형식 정보는 설치된 Windows SDK(Windows Kits\10\UnionMetadata)에서 읽는다.
+  -->
+  <PropertyGroup>
+    <CsWinRTWindowsMetadata>local</CsWinRTWindowsMetadata>
+    <CsWinRTIncludes>
+      Windows.Media.Control;
+      Windows.Media.MediaPlaybackAutoRepeatMode;
+      Windows.Media.MediaPlaybackType;
+      Windows.Foundation;
+      Windows.Storage.Streams.IRandomAccessStream;
+      Windows.Storage.Streams.IInputStream;
+      Windows.Storage.Streams.IOutputStream;
+      Windows.Storage.Streams.IContentTypeProvider;
+      Windows.Storage.Streams.IBuffer;
+      Windows.Storage.Streams.Buffer;
+      Windows.Storage.Streams.InputStreamOptions;
+      Windows.Storage.Streams.DataReader;
+      Windows.Storage.Streams.IDataReader;
+      Windows.Storage.Streams.UnicodeEncoding;
+      Windows.Storage.Streams.ByteOrder
+    </CsWinRTIncludes>
+    <!-- 위 형식들이 끌어오지만 쓰지 않는 것. 투영하면 Windows.Storage 전체가 필요해진다. -->
+    <CsWinRTExcludes>
+      Windows.Foundation.Diagnostics;
+      Windows.Storage.Streams.IRandomAccessStreamReferenceStatics
+    </CsWinRTExcludes>
+  </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="10.0.12" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Windows.CsWinRT" Version="2.2.0" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="MoniMS.Core.Tests" />

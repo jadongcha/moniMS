@@ -55,6 +55,11 @@ internal static partial class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool CloseHandle(IntPtr handle);
 
+    /// <summary>다른 프로세스의 실행 파일 경로 (음악 위젯이 앱의 소리 세션을 찾을 때).</summary>
+    [LibraryImport("kernel32.dll", EntryPoint = "QueryFullProcessImageNameW", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static unsafe partial bool QueryFullProcessImageName(IntPtr process, uint flags, char* path, ref uint size);
+
     [LibraryImport("kernel32.dll", SetLastError = true)]
     internal static partial IntPtr VirtualAllocEx(IntPtr process, IntPtr address, nuint size, uint allocationType, uint protect);
 
@@ -104,6 +109,7 @@ internal static partial class NativeMethods
     internal const uint SPIF_UPDATEINIFILE = 0x01;
     internal const uint SPIF_SENDCHANGE = 0x02;
 
+    internal const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
     internal const uint PROCESS_VM_OPERATION = 0x0008;
     internal const uint PROCESS_VM_READ = 0x0010;
     internal const uint PROCESS_VM_WRITE = 0x0020;

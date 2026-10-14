@@ -106,20 +106,6 @@ public sealed class WallpaperService : IWallpaperService
         }
     }
 
-    public void SetForAllMonitors(string imagePath, WallpaperPosition position)
-    {
-        var dw = Create();
-        try
-        {
-            dw.SetPosition((int)position);
-            dw.SetWallpaper(null, imagePath); // monitorId가 null이면 모든 모니터
-        }
-        finally
-        {
-            Marshal.ReleaseComObject(dw);
-        }
-    }
-
     private static IDesktopWallpaper Create() => (IDesktopWallpaper)new DesktopWallpaperClass();
 
     /// <summary>원본이 지워졌으면 Windows가 보관하는 변환본(TranscodedWallpaper)을 사용.</summary>
