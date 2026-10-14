@@ -19,7 +19,7 @@ internal static partial class WidgetSnapping
     public const double EdgeMargin = 24;
 
     /// <summary>이만큼 가까워지면 붙는다 (DIP).</summary>
-    public const double Threshold = 16;
+    public const double Threshold = 8;
 
     private const int WM_MOVING = 0x0216;
     private const uint MONITOR_DEFAULTTONEAREST = 2;

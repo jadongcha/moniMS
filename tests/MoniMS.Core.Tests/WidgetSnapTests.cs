@@ -6,7 +6,7 @@ public class WidgetSnapTests
 {
     private const int Gap = 6;
     private const int EdgeMargin = 24;
-    private const int Threshold = 16;
+    private const int Threshold = 8;
 
     private static readonly SnapRect Work = new(0, 0, 1920, 1040);
 
@@ -29,7 +29,7 @@ public class WidgetSnapTests
     [Fact]
     public void On_the_left_side_it_snaps_too()
     {
-        var moving = At(A.Left - Gap - 200 - 9, A.Top - 4);
+        var moving = At(A.Left - Gap - 200 - 7, A.Top - 4);
         var (dx, dy) = Snap(moving, A);
         Assert.Equal((A.Left - Gap - 200, A.Top), (moving.Left + dx, moving.Top + dy));
     }
@@ -67,7 +67,7 @@ public class WidgetSnapTests
     public void Edges_line_up_even_when_the_widgets_are_apart()
     {
         // 멀리 아래에 있어도 왼쪽 끝은 맞춰진다 (화면 정돈)
-        var moving = At(A.Left - 10, 800);
+        var moving = At(A.Left - 6, 800);
         var (dx, _) = Snap(moving, A);
         Assert.Equal(A.Left, moving.Left + dx);
     }
@@ -75,7 +75,7 @@ public class WidgetSnapTests
     [Fact]
     public void Near_the_screen_edge_it_keeps_the_edge_margin()
     {
-        var moving = At(Work.Right - EdgeMargin - 200 + 10, EdgeMargin - 6);
+        var moving = At(Work.Right - EdgeMargin - 200 + 7, EdgeMargin - 6);
         var (dx, dy) = Snap(moving);
         Assert.Equal((Work.Right - EdgeMargin, EdgeMargin), (moving.Right + dx, moving.Top + dy));
     }

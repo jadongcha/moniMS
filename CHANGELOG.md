@@ -6,6 +6,11 @@ Write upcoming changes under **[Unreleased]**; `release.ps1` moves them into the
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-10-14
+
+### Changed
+- Widget snapping is gentler: a widget snaps only when you bring it closer, and pulls away with a shorter drag.
+
 ## [0.5.2] - 2026-10-14
 
 ### Changed
